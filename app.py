@@ -49,7 +49,6 @@ def calcular_dre_completo(p, staff):
     custo_folha_base = sum([c['salario'] * c['qtd'] for c in staff])
     
     # NRR Estimado (Projeção): 1 + Upsell - Churn
-    # Em dados reais, compararia safras (Cohorts).
     nrr_projetado = (1 + p['upsell'] - p['churn_rate'])
 
     for m in meses:
@@ -106,15 +105,11 @@ def calcular_dre_completo(p, staff):
         
         # Ponto de Equilíbrio (Break-Even)
         custos_fixos_totais = despesas_operacionais + deprec_amort - res_fin
-        # Margem bruta sobre Receita Bruta (para cálculo de PE sobre faturamento bruto)
         margem_bruta_pct = (margem_cont / receita_bruta) if receita_bruta > 0 else 0
         pe_receita = custos_fixos_totais / margem_bruta_pct if margem_bruta_pct > 0 else 0
         
         # Unit Economics
         cac = (p['mkt'] + comissoes) / novos if novos > 0 else 0
-        # LTV = (Ticket * Margem Contribuição %) / Churn
-        # Margem Contribuição % aqui é sobre a receita líquida ou bruta? 
-        # Tradicionalmente usa-se Gross Margin. Usaremos Margem de Contribuição / Rec Liq
         ltv = (p['ticket'] * margem_cont_pct) / p['churn_rate'] if p['churn_rate'] > 0 else 0
         payback = cac / (p['ticket'] * margem_cont_pct) if (p['ticket'] * margem_cont_pct) > 0 else 0
 
@@ -185,10 +180,11 @@ with st.sidebar:
             s_cs = st.number_input("Sal. Suporte", 2500.0)
             s_venda = st.number_input("Sal. Vendas", 3000.0)
         with col2:
-            q_socio = st.number_input("Qtd", 2)
-            q_dev = st.number_input("Qtd", 2)
-            q_cs = st.number_input("Qtd", 1)
-            q_venda = st.number_input("Qtd", 1)
+            # CORREÇÃO AQUI: Adicionado key unique para evitar DuplicateElementId
+            q_socio = st.number_input("Qtd", 2, key="q_socio")
+            q_dev = st.number_input("Qtd", 2, key="q_dev")
+            q_cs = st.number_input("Qtd", 1, key="q_cs")
+            q_venda = st.number_input("Qtd", 1, key="q_venda")
             
         p_encargos = st.number_input("Encargos (%)", value=0.35, step=0.01)
         
@@ -332,7 +328,7 @@ with tab3:
     * **Ponto de Equilíbrio (Break-Even):** Faturamento necessário para Lucro Líquido = 0.
     
     #### 4. Tributário
-    * **Fator R:** Razão entre Folha de Pagamento e Faturamento Bruto.
+    * **Fator R:** Razão entre Folha de Pagamento e Faturamento.
         * Se Folha > 28% da Receita -> Anexo III (Imposto Reduzido).
         * Se Folha < 28% da Receita -> Anexo V (Imposto Alto).
         * *O sistema monitora isso automaticamente no gráfico de "velocímetro".*
