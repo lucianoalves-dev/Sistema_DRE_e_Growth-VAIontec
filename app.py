@@ -3,8 +3,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import io
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Vaiontec | CFO Suite", layout="wide", page_icon="💎", initial_sidebar_state="collapsed")
+# --- 1. CONFIGURAÇÃO ---
+st.set_page_config(page_title="Vaiontec | Growth Intelligence", layout="wide", page_icon="🚀", initial_sidebar_state="collapsed")
 
 # --- 2. CSS (CORPORATE BLUE + INPUTS PRO) ---
 st.markdown("""
@@ -33,32 +33,84 @@ st.markdown("""
         /* INPUT CARD */
         .input-group-title { color: #1f497d; font-size: 16px; font-weight: 700; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
         .input-card { background-color: white; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
-        .input-label { font-weight: 700; color: #333; font-size: 13px; margin-bottom: 4px; }
-        .input-meta { font-size: 11px; color: #666; margin-bottom: 8px; font-style: italic; min-height: 25px; line-height: 1.2; }
+        .input-title { font-weight: 700; color: #1f497d; font-size: 14px; margin-bottom: 4px; }
+        .input-desc { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; min-height: 30px; line-height: 1.2; }
         
         /* ABAS */
         .stTabs [data-baseweb="tab-list"] { gap: 5px; border-bottom: 2px solid #e9ecef; }
         .stTabs [data-baseweb="tab"] { background-color: white; border-radius: 4px 4px 0 0; padding: 10px 20px; color: #495057; border: 1px solid #e9ecef; border-bottom: none; }
         .stTabs [aria-selected="true"] { background-color: #1f497d !important; color: white !important; }
         
-        /* GLOSSÁRIO */
-        .glossary-card { background-color: white; padding: 25px; border-radius: 8px; border-left: 5px solid #2980b9; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        /* GLOSSÁRIO (ESTILO RESTAURADO) */
+        .glossary-card { background-color: white; padding: 20px; border-radius: 8px; border-left: 5px solid #2980b9; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .glossary-term { color: #1f497d; font-size: 18px; font-weight: 800; margin-bottom: 5px; }
+        .glossary-cat { background-color: #eef2f7; color: #555; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-left: 10px; }
+        .glossary-desc { color: #444; font-size: 15px; margin-top: 10px; line-height: 1.5; }
+        .glossary-tip { background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 13px; border: 1px solid #ffeeba; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. BANCO DE DADOS (GLOSSÁRIO) ---
+# --- 3. DADOS DO GLOSSÁRIO (ESTRUTURA COMPLETA) ---
 GLOSSARIO_DB = [
-    {"termo": "MRR", "cat": "Receita", "conc": "Receita Recorrente Mensal.", "form": "Clientes x Ticket", "interpretacao": "O motor da empresa."},
-    {"termo": "NRR", "cat": "Growth", "conc": "Retenção Líquida.", "form": "(Rec Inicial + Upsell - Churn)/Rec Inicial", "interpretacao": ">100% é excelente."},
-    {"termo": "CAC", "cat": "Eficiência", "conc": "Custo p/ trazer 1 cliente.", "form": "(Mkt + Vendas) / Novos Clientes", "interpretacao": "Quanto menor, melhor."},
-    {"termo": "LTV", "cat": "Eficiência", "conc": "Lucro Vitalício do cliente.", "form": "(Ticket x Margem%) / Churn%", "interpretacao": "Deve ser 3x maior que o CAC."},
-    {"termo": "Payback", "cat": "Eficiência", "conc": "Meses p/ recuperar o CAC.", "form": "CAC / (Ticket x Margem)", "interpretacao": "Meta: < 12 meses."},
-    {"termo": "Ponto de Equilíbrio", "cat": "Resultado", "conc": "Faturamento p/ zerar custos.", "form": "Custos Fixos / Margem %", "interpretacao": "Meta mínima de sobrevivência."},
-    {"termo": "Fator R", "cat": "Tributário", "conc": "Razão Folha/Fat.", "form": "Folha / Faturamento", "interpretacao": "Manter > 28% (Anexo III)."}
+    {
+        "termo": "MRR (Monthly Recurring Revenue)",
+        "categoria": "Receita",
+        "conceito": "Receita Recorrente Mensal. É a soma de todas as assinaturas ativas. O principal indicador de saúde de um SaaS.",
+        "formula": r"MRR = \text{Clientes Ativos} \times \text{Ticket Médio}",
+        "interpretacao": "Se o MRR sobe, a empresa cresce. Quedas indicam Churn alto."
+    },
+    {
+        "termo": "NRR (Net Revenue Retention)",
+        "categoria": "Growth",
+        "conceito": "Retenção Líquida de Receita. Mede quanto da receita do mês anterior permaneceu, somando expansões (upsell) e descontando cancelamentos.",
+        "formula": r"NRR = \frac{(\text{Receita Inicial} + \text{Upsell} - \text{Churn})}{\text{Receita Inicial}}",
+        "interpretacao": "Acima de 100% (ou 1.0) significa crescimento orgânico sem novas vendas."
+    },
+    {
+        "termo": "CAC (Custo de Aquisição)",
+        "categoria": "Eficiência",
+        "conceito": "Valor gasto em Marketing e Vendas para conquistar 1 novo cliente.",
+        "formula": r"CAC = \frac{\text{Mkt} + \text{Comissões} + \text{Salários Vendas}}{\text{Novos Clientes}}",
+        "interpretacao": "Quanto menor, melhor a eficiência da máquina de vendas."
+    },
+    {
+        "termo": "LTV (Lifetime Value)",
+        "categoria": "Eficiência",
+        "conceito": "Lucro bruto total que um cliente deixa na empresa durante toda sua vida útil.",
+        "formula": r"LTV = \frac{\text{Ticket Médio} \times \text{Margem Contribuição \%}}{\text{Churn Rate}}",
+        "interpretacao": "O LTV deve ser pelo menos 3x maior que o CAC (LTV/CAC > 3)."
+    },
+    {
+        "termo": "Payback Period",
+        "categoria": "Eficiência",
+        "conceito": "Tempo (em meses) para recuperar o investimento feito para adquirir o cliente (CAC).",
+        "formula": r"Payback = \frac{CAC}{\text{Ticket Médio} \times \text{Margem Contribuição}}",
+        "interpretacao": "Ideal: Menos de 12 meses para fluxo de caixa saudável."
+    },
+    {
+        "termo": "Ponto de Equilíbrio",
+        "categoria": "Financeiro",
+        "conceito": "Faturamento necessário para cobrir todos os custos e despesas (Lucro Zero).",
+        "formula": r"PE = \frac{\text{Custos Fixos Totais}}{\text{Margem Contribuição \%}}",
+        "interpretacao": "Abaixo disso é prejuízo (Burn Rate). Acima é lucro."
+    },
+    {
+        "termo": "EBITDA",
+        "categoria": "Financeiro",
+        "conceito": "Lucro antes de Juros, Impostos, Depreciação e Amortização. Mede a geração de caixa operacional.",
+        "formula": r"EBITDA = \text{Margem Contribuição} - \text{Despesas Operacionais}",
+        "interpretacao": "Indica se a operação da empresa para de pé sozinha."
+    },
+    {
+        "termo": "Fator R",
+        "categoria": "Tributário",
+        "conceito": "Razão entre Folha de Pagamento e Faturamento para definir anexo do Simples Nacional.",
+        "formula": r"Fator R = \frac{\text{Folha Total}}{\text{Faturamento Bruto}}",
+        "interpretacao": "Mantenha > 28% para pagar imposto reduzido (Anexo III ~6%)."
+    }
 ]
 
 # --- 4. INICIALIZAÇÃO DE ESTADO ---
-# Mapeamento completo de TODOS os inputs necessários para o DRE
 defaults = {
     # 1. Receita Drivers
     'cli_ini': 50, 'cresc': 0.10, 'churn': 0.03, 'ticket': 500.0, 'upsell': 0.05,
@@ -66,7 +118,7 @@ defaults = {
     'cogs': 30.0, 'comissao': 0.05, 'imposto': 0.06, 'taxa': 0.02,
     # 3. Fixos
     'mkt': 5000.0, 'outros': 3000.0, 
-    # 4. Folha (Detalhamento)
+    # 4. Folha
     's_socio': 8000.0, 'q_socio': 2, 
     's_dev': 5000.0, 'q_dev': 2,
     's_cs': 2500.0, 'q_cs': 1,
@@ -76,7 +128,6 @@ defaults = {
     'deprec': 400.0, 'amort': 600.0, 'fin': 0.0, 'irpj': 0.0
 }
 
-# Nome amigável para o CSV
 key_map = {
     'cli_ini': 'Clientes Iniciais', 'cresc': 'Tx Crescimento Mensal', 'churn': 'Tx Churn Mensal',
     'ticket': 'Ticket Médio (R$)', 'upsell': 'Tx Upsell (% Rec)',
@@ -96,7 +147,6 @@ for k, v in defaults.items():
 # --- 5. FUNÇÕES ---
 def gerar_template_csv():
     data = []
-    # Garante que pega o valor ATUAL da tela, não o default
     for k in defaults.keys():
         data.append({'Parametro': key_map.get(k, k), 'Valor': st.session_state[k], 'Codigo_Interno': k})
     return pd.DataFrame(data)
@@ -125,16 +175,16 @@ def calcular_dre():
     nrr = 1 + s['upsell'] - s['churn']
 
     for m in meses:
-        # Growth Logic
+        # Lógica de Growth
         novos = int(cli * s['cresc'])
         perda = int(cli * s['churn'])
         fim = cli + novos - perda
         
-        # Revenue Logic
+        # Receita
         mrr = fim * s['ticket']
         rec_bruta = mrr * (1 + s['upsell'])
         
-        # Variable Costs Logic
+        # Variáveis
         imp_val = rec_bruta * s['imposto']
         rec_liq = rec_bruta - imp_val
         cogs_val = fim * s['cogs']
@@ -144,18 +194,18 @@ def calcular_dre():
         custos_var_total = cogs_val + comissao_val + taxa_val
         margem = rec_liq - custos_var_total
         
-        # Fixed Costs Logic
+        # Fixos
         folha_tot = folha_base * (1 + s['encargos'])
         fixos_op = folha_tot + s['mkt'] + s['outros']
         
-        # Results Logic
+        # Resultados
         ebitda = margem - fixos_op
         deprec_amort = s['deprec'] + s['amort']
         ebit = ebitda - deprec_amort
         lair = ebit + s['fin']
         lucro = lair * (1 - s['irpj']) if lair > 0 else lair
         
-        # KPIs Logic (Protected)
+        # KPIs (Protegidos contra div/0)
         mc_pct = margem / rec_liq if rec_liq > 0 else 0
         mb_pct = margem / rec_bruta if rec_bruta > 0 else 0
         
@@ -191,10 +241,10 @@ def calcular_dre():
 
 # --- INTERFACE ---
 c1, c2 = st.columns([0.5, 6])
-with c1: st.markdown("### 💎")
+with c1: st.markdown("### 🚀")
 with c2: 
-    st.markdown("### Vaiontec | CFO Suite")
-    st.caption("Strategic Financial Planning & Analysis (FP&A)")
+    st.markdown("### Vaiontec | Growth & Financial Intelligence")
+    st.caption("Strategic Dashboard for CRO/CFO")
 
 tab_dash, tab_dre, tab_input, tab_gloss = st.tabs(["📊 Executive Dashboard", "📑 Relatório DRE (Corporate)", "⚙️ Inputs & Update", "📚 Knowledge Base"])
 
@@ -218,7 +268,7 @@ with tab_dash:
     with c1: card("LTV", f['LTV (R$)'], "Lucro Vitalício")
     with c2: card("CAC", f['CAC (R$)'], "Custo Aquisição")
     with c3: card("Payback", f"{f['Payback (Meses)']:.1f} Meses", "Meta < 12", "good" if f['Payback (Meses)']<12 else "bad", False)
-    with c4: card("Fator R", f"{f['Fator R (%)']*100:.1f}%", "Anexo III (>28%)" if f['Fator R (%)']>=0.28 else "Anexo V", "good" if f['Fator R (%)']>=0.28 else "bad", False)
+    with c4: card("NRR (Retenção)", f"{f['NRR (Estimado)']*100:.1f}%", "Meta > 100%", "good" if f['NRR (Estimado)']>=1 else "bad", False)
 
     st.markdown("---")
     g1, g2 = st.columns([2, 1])
@@ -270,7 +320,7 @@ with tab_dre:
     st.dataframe(df_disp, use_container_width=True, height=800)
     st.download_button("📥 Baixar DRE (.csv)", df_disp.to_csv().encode('utf-8'), "DRE_Vaiontec.csv", "text/csv")
 
-# --- ABA 3: INPUTS (REDESENHADA E 100% COMPLETA) ---
+# --- ABA 3: INPUTS ---
 with tab_input:
     # HELPER DE INPUT VISUAL
     def input_box(key, label, desc, fmt="%.2f", step=0.01, min_val=0.0):
@@ -342,15 +392,18 @@ with tab_input:
 
 # --- ABA 4: GLOSSÁRIO ---
 with tab_gloss:
-    st.markdown("### 🔍 Base de Conhecimento")
-    search = st.text_input("Pesquisar...", "").lower()
+    st.markdown("### 🔍 Knowledge Base")
+    search = st.text_input("Pesquisar indicador...", "").lower()
+    st.markdown("---")
+    
     for item in GLOSSARIO_DB:
-        if search in item['termo'].lower() or search in item['conc'].lower() or search == "":
+        if search in item['termo'].lower() or search in item['conceito'].lower() or search == "":
             st.markdown(f"""
             <div class="glossary-card">
-                <div class="glossary-term">{item['termo']} <span style="font-size:12px; color:#1f497d; border:1px solid #1f497d; padding:2px 6px; border-radius:4px">{item['categoria']}</span></div>
-                <div style="color:#555; margin-bottom:10px">{item['conc']}</div>
-                <div class="formula-box" style="background:#f8f9fa; padding:8px; border-radius:4px; font-family:monospace; color:#d35400;">🧮 {item['form']}</div>
-                <div style="font-style:italic; font-size:13px; color:#666; margin-top:8px">💡 {item['interpretacao']}</div>
+                <div class="glossary-term">{item['termo']} <span class="glossary-cat">{item['categoria']}</span></div>
+                <div class="glossary-desc">{item['conceito']}</div>
+                <div class="glossary-tip">💡 {item['interpretacao']}</div>
             </div>
             """, unsafe_allow_html=True)
+            # FÓRMULA COM ST.LATEX (AQUI ESTAVA O ERRO ANTERIOR)
+            st.latex(item['formula'])
