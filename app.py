@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Vaiontec | CFO Dashboard", 
     layout="wide", 
     page_icon="💎",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed" # Sidebar escondida para focar no app
 )
 
 # --- 2. DESIGN SYSTEM (CSS TEMA LIGHT/BLUE) ---
@@ -50,8 +50,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. INICIALIZAÇÃO DE ESTADO (SESSION STATE) ---
-
-# Mapeamento corrigido com quebras de linha seguras
+# Mapeamento interno vs Nome legível para CSV
 key_map = {
     'cli_ini': 'Clientes Iniciais',
     'cresc': 'Crescimento Mensal (%)',
@@ -69,14 +68,10 @@ key_map = {
     'amort': 'Amortização (R$)',
     'fin': 'Resultado Financeiro (R$)',
     'irpj': 'IRPJ Extra (%)',
-    's_socio': 'Salário Sócio', 
-    'q_socio': 'Qtd Sócios',
-    's_dev': 'Salário Dev', 
-    'q_dev': 'Qtd Devs',
-    's_cs': 'Salário CS', 
-    'q_cs': 'Qtd CS',
-    's_venda': 'Salário Vendas', 
-    'q_venda': 'Qtd Vendas'
+    's_socio': 'Salário Sócio', 'q_socio': 'Qtd Sócios',
+    's_dev': 'Salário Dev', 'q_dev': 'Qtd Devs',
+    's_cs': 'Salário CS', 'q_cs': 'Qtd CS',
+    's_venda': 'Salário Vendas', 'q_venda': 'Qtd Vendas'
 }
 
 defaults = {
@@ -97,6 +92,7 @@ for key, val in defaults.items():
 # --- 4. FUNÇÕES AUXILIARES ---
 
 def gerar_template_csv():
+    """Gera um DataFrame com os valores atuais para servir de template"""
     data = []
     for k, v in defaults.items():
         val_atual = st.session_state[k]
@@ -105,14 +101,18 @@ def gerar_template_csv():
     return pd.DataFrame(data)
 
 def processar_upload(df_upload):
+    """Lê o CSV e atualiza o Session State"""
     try:
+        # Cria dicionário reverso (Nome Legivel -> Valor) e (Codigo -> Valor)
         updates = {}
         for index, row in df_upload.iterrows():
+            # Tenta pegar pelo código interno primeiro, se não pelo nome
             codigo = row.get('Codigo_Interno')
             valor = row['Valor']
             if codigo and codigo in defaults:
                 updates[codigo] = valor
         
+        # Atualiza o estado
         for k, v in updates.items():
             st.session_state[k] = float(v)
         
@@ -229,16 +229,23 @@ with tab_dash:
         </div>
         """, unsafe_allow_html=True)
 
-    # LINHA 1
+    # LINHA 1: KPIs Principais (Solicitados: Faturamento, Clientes)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: card("Faturamento Mensal (Bruto)", f['Receita Bruta'], f"Projeção Mês 12", "neutral")
-    with c2: card("Base de Clientes Ativos", int(f['Clientes']), f"Novos: +{int(f['Novos'])} este mês", "neutral", is_money=False)
+    with c1: 
+        # Faturamento (Receita Bruta)
+        card("Faturamento Mensal (Bruto)", f['Receita Bruta'], f"Projeção Mês 12", "neutral")
+    with c2:
+        # Quantidade de Clientes
+        card("Base de Clientes Ativos", int(f['Clientes']), f"Novos: +{int(f['Novos'])} este mês", "neutral", is_money=False)
     with c3:
+        # Lucro Líquido
         cor = "good" if f['Lucro Líquido'] > 0 else "bad"
         card("Lucro Líquido", f['Lucro Líquido'], f"Margem Líq: {(f['Lucro Líquido']/f['Receita Bruta'])*100:.1f}%", cor)
-    with c4: card("Ponto de Equilíbrio (Meta)", f['Ponto Equilíbrio'], "Necessário para zerar custos", "neutral")
+    with c4:
+        # Ponto de Equilíbrio
+        card("Ponto de Equilíbrio (Meta)", f['Ponto Equilíbrio'], "Necessário para zerar custos", "neutral")
 
-    # LINHA 2
+    # LINHA 2: Eficiência & Growth
     c1, c2, c3, c4 = st.columns(4)
     with c1: card("LTV (Valor Vitalício)", f['LTV'], "Lucro por cliente")
     with c2: card("CAC (Custo Aquisição)", f['CAC'], "Mkt + Comissões")
@@ -270,19 +277,16 @@ with tab_dash:
 with tab_dre:
     st.markdown("### 📑 Detalhamento Financeiro")
     
+    # Download
     csv = df.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Baixar DRE Completo (.csv)", data=csv, file_name="Vaiontec_DRE_Full.csv", mime="text/csv")
     
+    # Visualização
     df_show = df.copy()
     format_money = lambda x: f"R$ {x:,.2f}"
     format_pct = lambda x: f"{x*100:.1f}%"
     
-    cols_money = [
-        'MRR', 'Receita Bruta', 'Receita Líquida', 'COGS', 
-        'Margem Contrib.', 'EBITDA', 'Lucro Líquido', 
-        'Ponto Equilíbrio', 'CAC', 'LTV'
-    ]
-    
+    cols_money = ['MRR', 'Receita Bruta', 'Receita Líquida', 'COGS', 'Margem Contrib.', 'EBITDA', 'Lucro Líquido', 'Ponto Equilíbrio', 'CAC', 'LTV']
     for c in cols_money: df_show[c] = df_show[c].apply(format_money)
     
     df_show['Fator R'] = df_show['Fator R'].apply(format_pct)
@@ -290,10 +294,11 @@ with tab_dre:
     
     st.dataframe(df_show, use_container_width=True, height=600)
 
-# --- ABA 3: INPUTS ---
+# --- ABA 3: INPUTS (ATUALIZAÇÃO) ---
 with tab_input:
     st.markdown("### ⚙️ Centro de Atualização de Dados")
     
+    # SELETOR DE MODO
     modo = st.radio("Como deseja atualizar?", ["📝 Edição Manual", "📂 Upload de Planilha Padrão"], horizontal=True)
     st.markdown("---")
 
@@ -303,7 +308,13 @@ with tab_input:
             st.info("Passo 1: Baixe o modelo atual com os metadados corretos.")
             df_template = gerar_template_csv()
             csv_template = df_template.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Baixar Modelo de Planilha (.csv)", csv_template, "template_vaiontec.csv", "text/csv")
+            st.download_button(
+                label="📥 Baixar Modelo de Planilha (.csv)",
+                data=csv_template,
+                file_name="template_vaiontec.csv",
+                mime="text/csv",
+            )
+            st.caption("O arquivo contém as colunas: Parametro, Valor e Codigo_Interno.")
             
         with c_up:
             st.info("Passo 2: Faça o upload do arquivo preenchido.")
@@ -313,30 +324,32 @@ with tab_input:
                 processar_upload(df_up)
                 
     else:
+        # MODO MANUAL COM METADADOS
         col_a, col_b = st.columns(2)
+        
         with col_a:
             st.subheader("1. Vendas & Growth")
-            st.session_state['cli_ini'] = st.number_input("Clientes Iniciais", value=st.session_state['cli_ini'])
-            st.session_state['cresc'] = st.number_input("Crescimento Mensal (%)", value=st.session_state['cresc'], format="%.2f")
-            st.session_state['churn'] = st.number_input("Churn Rate (%)", value=st.session_state['churn'], format="%.2f")
-            st.session_state['ticket'] = st.number_input("Ticket Médio (R$)", value=st.session_state['ticket'])
-            st.session_state['upsell'] = st.number_input("Upsell (% da Rec.)", value=st.session_state['upsell'], format="%.2f")
+            st.session_state['cli_ini'] = st.number_input("Clientes Iniciais", value=st.session_state['cli_ini'], help="Número total de clientes ativos no início do período.")
+            st.session_state['cresc'] = st.number_input("Crescimento Mensal (%)", value=st.session_state['cresc'], format="%.2f", help="Taxa percentual de novos clientes adquiridos sobre a base.")
+            st.session_state['churn'] = st.number_input("Churn Rate (%)", value=st.session_state['churn'], format="%.2f", help="Percentual de cancelamento mensal da base.")
+            st.session_state['ticket'] = st.number_input("Ticket Médio (R$)", value=st.session_state['ticket'], help="Valor médio da assinatura mensal cobrada.")
+            st.session_state['upsell'] = st.number_input("Upsell (% da Rec.)", value=st.session_state['upsell'], format="%.2f", help="Receita adicional gerada na base atual (Expansão).")
 
             st.subheader("2. Custos Variáveis (COGS)")
-            st.session_state['cogs'] = st.number_input("COGS Unitário (R$)", value=st.session_state['cogs'])
-            st.session_state['comissao'] = st.number_input("Comissão Vendas (%)", value=st.session_state['comissao'], format="%.2f")
-            st.session_state['taxa'] = st.number_input("Taxa Meios Pagto (%)", value=st.session_state['taxa'], format="%.2f")
-            st.session_state['imposto'] = st.number_input("Simples Nacional (%)", value=st.session_state['imposto'], format="%.2f")
+            st.session_state['cogs'] = st.number_input("COGS Unitário (R$)", value=st.session_state['cogs'], help="Custo direto de infraestrutura/licença POR cliente.")
+            st.session_state['comissao'] = st.number_input("Comissão Vendas (%)", value=st.session_state['comissao'], format="%.2f", help="% paga a parceiros sobre o Faturamento Bruto.")
+            st.session_state['taxa'] = st.number_input("Taxa Meios Pagto (%)", value=st.session_state['taxa'], format="%.2f", help="Taxa de cartão/boleto sobre o Faturamento Bruto.")
+            st.session_state['imposto'] = st.number_input("Simples Nacional (%)", value=st.session_state['imposto'], format="%.2f", help="Alíquota efetiva do imposto sobre a nota fiscal.")
 
         with col_b:
             st.subheader("3. Despesas Fixas & Pessoal")
-            st.session_state['mkt'] = st.number_input("Marketing (R$)", value=st.session_state['mkt'])
-            st.session_state['outros'] = st.number_input("Outros Fixos (R$)", value=st.session_state['outros'])
+            st.session_state['mkt'] = st.number_input("Marketing (R$)", value=st.session_state['mkt'], help="Budget fixo mensal para aquisição de clientes (Ads, Eventos).")
+            st.session_state['outros'] = st.number_input("Outros Fixos (R$)", value=st.session_state['outros'], help="Aluguel, Softwares internos, Contabilidade, etc.")
             
             with st.expander("Detalhamento da Folha (Salários)", expanded=True):
                 c_sal, c_qtd = st.columns([2,1])
                 with c_sal:
-                    st.session_state['s_socio'] = st.number_input("Salário Sócio", st.session_state['s_socio'])
+                    st.session_state['s_socio'] = st.number_input("Salário Sócio", st.session_state['s_socio'], help="Pró-labore individual")
                     st.session_state['s_dev'] = st.number_input("Salário Dev", st.session_state['s_dev'])
                     st.session_state['s_cs'] = st.number_input("Salário CS", st.session_state['s_cs'])
                     st.session_state['s_venda'] = st.number_input("Salário Vendas", st.session_state['s_venda'])
@@ -346,13 +359,12 @@ with tab_input:
                     st.session_state['q_cs'] = st.number_input("Qtd", st.session_state['q_cs'], key="k_q_cs")
                     st.session_state['q_venda'] = st.number_input("Qtd", st.session_state['q_venda'], key="k_q_venda")
             
-            st.session_state['encargos'] = st.number_input("Encargos (%)", value=st.session_state['encargos'], format="%.2f")
+            st.session_state['encargos'] = st.number_input("Encargos (%)", value=st.session_state['encargos'], format="%.2f", help="% sobre a folha (FGTS, Férias, 13º). Simples Nacional geralmente ~35%.")
 
             st.subheader("4. Contábil")
-            st.session_state['deprec'] = st.number_input("Depreciação (R$)", st.session_state['deprec'])
-            st.session_state['amort'] = st.number_input("Amortização (R$)", st.session_state['amort'])
-            st.session_state['fin'] = st.number_input("Resultado Fin. (R$)", st.session_state['fin'])
-            st.session_state['irpj'] = st.number_input("IRPJ Extra (%)", st.session_state['irpj'])
+            st.session_state['deprec'] = st.number_input("Depreciação (R$)", st.session_state['deprec'], help="Perda de valor de equipamentos.")
+            st.session_state['amort'] = st.number_input("Amortização (R$)", st.session_state['amort'], help="Perda de valor de intangíveis (Software).")
+            st.session_state['fin'] = st.number_input("Resultado Fin. (R$)", st.session_state['fin'], help="Rendimentos (+) ou Juros Pagos (-).")
 
 # --- ABA 4: GLOSSÁRIO ---
 with tab_gloss:
