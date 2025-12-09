@@ -297,4 +297,84 @@ with tab_input:
     modo = st.radio("Como deseja atualizar?", ["📝 Edição Manual", "📂 Upload de Planilha Padrão"], horizontal=True)
     st.markdown("---")
 
-    if modo == "📂 Upload de
+    if modo == "📂 Upload de Planilha Padrão":
+        c_down, c_up = st.columns(2)
+        with c_down:
+            st.info("Passo 1: Baixe o modelo atual com os metadados corretos.")
+            df_template = gerar_template_csv()
+            csv_template = df_template.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Baixar Modelo de Planilha (.csv)", csv_template, "template_vaiontec.csv", "text/csv")
+            
+        with c_up:
+            st.info("Passo 2: Faça o upload do arquivo preenchido.")
+            uploaded_file = st.file_uploader("Carregar arquivo .csv", type=['csv'])
+            if uploaded_file is not None:
+                df_up = pd.read_csv(uploaded_file)
+                processar_upload(df_up)
+                
+    else:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.subheader("1. Vendas & Growth")
+            st.session_state['cli_ini'] = st.number_input("Clientes Iniciais", value=st.session_state['cli_ini'])
+            st.session_state['cresc'] = st.number_input("Crescimento Mensal (%)", value=st.session_state['cresc'], format="%.2f")
+            st.session_state['churn'] = st.number_input("Churn Rate (%)", value=st.session_state['churn'], format="%.2f")
+            st.session_state['ticket'] = st.number_input("Ticket Médio (R$)", value=st.session_state['ticket'])
+            st.session_state['upsell'] = st.number_input("Upsell (% da Rec.)", value=st.session_state['upsell'], format="%.2f")
+
+            st.subheader("2. Custos Variáveis (COGS)")
+            st.session_state['cogs'] = st.number_input("COGS Unitário (R$)", value=st.session_state['cogs'])
+            st.session_state['comissao'] = st.number_input("Comissão Vendas (%)", value=st.session_state['comissao'], format="%.2f")
+            st.session_state['taxa'] = st.number_input("Taxa Meios Pagto (%)", value=st.session_state['taxa'], format="%.2f")
+            st.session_state['imposto'] = st.number_input("Simples Nacional (%)", value=st.session_state['imposto'], format="%.2f")
+
+        with col_b:
+            st.subheader("3. Despesas Fixas & Pessoal")
+            st.session_state['mkt'] = st.number_input("Marketing (R$)", value=st.session_state['mkt'])
+            st.session_state['outros'] = st.number_input("Outros Fixos (R$)", value=st.session_state['outros'])
+            
+            with st.expander("Detalhamento da Folha (Salários)", expanded=True):
+                c_sal, c_qtd = st.columns([2,1])
+                with c_sal:
+                    st.session_state['s_socio'] = st.number_input("Salário Sócio", st.session_state['s_socio'])
+                    st.session_state['s_dev'] = st.number_input("Salário Dev", st.session_state['s_dev'])
+                    st.session_state['s_cs'] = st.number_input("Salário CS", st.session_state['s_cs'])
+                    st.session_state['s_venda'] = st.number_input("Salário Vendas", st.session_state['s_venda'])
+                with c_qtd:
+                    st.session_state['q_socio'] = st.number_input("Qtd", st.session_state['q_socio'], key="k_q_socio")
+                    st.session_state['q_dev'] = st.number_input("Qtd", st.session_state['q_dev'], key="k_q_dev")
+                    st.session_state['q_cs'] = st.number_input("Qtd", st.session_state['q_cs'], key="k_q_cs")
+                    st.session_state['q_venda'] = st.number_input("Qtd", st.session_state['q_venda'], key="k_q_venda")
+            
+            st.session_state['encargos'] = st.number_input("Encargos (%)", value=st.session_state['encargos'], format="%.2f")
+
+            st.subheader("4. Contábil")
+            st.session_state['deprec'] = st.number_input("Depreciação (R$)", st.session_state['deprec'])
+            st.session_state['amort'] = st.number_input("Amortização (R$)", st.session_state['amort'])
+            st.session_state['fin'] = st.number_input("Resultado Fin. (R$)", st.session_state['fin'])
+            st.session_state['irpj'] = st.number_input("IRPJ Extra (%)", st.session_state['irpj'])
+
+# --- ABA 4: GLOSSÁRIO ---
+with tab_gloss:
+    st.markdown("### 📚 Dicionário de Indicadores")
+    
+    with st.expander("💰 Faturamento e Receita", expanded=True):
+        st.markdown("""
+        * **Faturamento Bruto:** Valor total das notas fiscais emitidas no mês. (Clientes x Ticket + Upsell).
+        * **MRR (Monthly Recurring Revenue):** Receita que se repete todo mês.
+        * **NRR (Net Revenue Retention):** Capacidade de retenção de receita. Se > 100%, sua empresa cresce organicamente.
+        """)
+        
+    with st.expander("📉 Custos e Despesas", expanded=True):
+        st.markdown("""
+        * **COGS (Cost of Goods Sold):** Custo para entregar o serviço. Se não tem cliente, esse custo é zero. (Ex: Cloud AWS).
+        * **CAC (Custo Aquisição):** Soma de Marketing e Comissões dividida pelos novos clientes.
+        * **Fator R:** Razão (Folha / Faturamento). Se ficar abaixo de 28%, o imposto sobe muito. Mantenha acima!
+        """)
+        
+    with st.expander("📊 Resultado", expanded=True):
+        st.markdown("""
+        * **Ponto de Equilíbrio (Break-Even):** Faturamento necessário para cobrir TODOS os custos e zerar o lucro.
+        * **EBITDA:** Lucro operacional (antes de depreciação e juros). Mede a saúde da operação.
+        * **Payback:** Tempo em meses para recuperar o dinheiro gasto para trazer um cliente.
+        """)
