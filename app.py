@@ -41,16 +41,16 @@ st.markdown("""
         .glossary-desc { color: #444; font-size: 16px; margin-top: 10px; line-height: 1.6; }
         .glossary-tip { background-color: #fff8e1; color: #856404; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 14px; border: 1px solid #ffeeba; }
 
-        /* INPUT CARD (NOVO) */
+        /* INPUT CARD */
         .input-card {
             background-color: white;
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         .input-title { font-weight: 700; color: #1f497d; font-size: 14px; margin-bottom: 4px; }
-        .input-desc { font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic; min-height: 35px; }
+        .input-desc { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; min-height: 30px; line-height: 1.2; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -171,11 +171,10 @@ def calcular_dre():
         ltv = (s['ticket'] * (margem/rec_liq)) / s['churn'] if s['churn'] > 0 else 0
         payback = cac / (s['ticket'] * (margem/rec_liq)) if (s['ticket'] * (margem/rec_liq)) > 0 else 0
         
-        # DADOS ESTRUTURADOS COM TICKET MÉDIO INCLUSO
         dados.append({
             'Mês': m,
             '1. Clientes Ativos': fim, '1.1 Novos': novos, '1.2 Churn (Qtd)': perda,
-            '1.3 Ticket Médio (R$)': s['ticket'], # --- ADICIONADO ---
+            '1.3 Ticket Médio (R$)': s['ticket'],
             '2. MRR (Recorrente)': mrr, '2.1 Receita Bruta Total': rec_bruta,
             '(-) Impostos': rec_bruta * s['imposto'],
             '3. Receita Líquida': rec_liq,
@@ -243,7 +242,6 @@ with tab_dre:
     st.markdown("### 📑 Demonstrativo de Resultados")
     df_dre = df_raw.set_index('Mês').T
     
-    # ORDEM LÓGICA ATUALIZADA COM TICKET MÉDIO
     ordem_logica = [
         "1. Clientes Ativos", "1.1 Novos", "1.2 Churn (Qtd)", "1.3 Ticket Médio (R$)",
         "2. MRR (Recorrente)", "2.1 Receita Bruta Total",
@@ -257,7 +255,6 @@ with tab_dre:
         "7. Ponto Equilíbrio (R$)", "Fator R (%)",
         "CAC (R$)", "LTV (R$)", "Payback (Meses)", "NRR (Estimado)"
     ]
-    
     df_dre = df_dre.reindex(ordem_logica)
     
     def formatar_valores(val, idx_name):
@@ -275,7 +272,7 @@ with tab_dre:
     csv = df_display.to_csv().encode('utf-8')
     st.download_button("📥 Baixar DRE Formatado (.csv)", data=csv, file_name="DRE_Vaiontec.csv", mime="text/csv")
 
-# --- ABA 3: INPUTS (COM METADADOS VISÍVEIS) ---
+# --- ABA 3: INPUTS (CORRIGIDA) ---
 with tab_input:
     modo = st.radio("Modo:", ["📝 Edição Manual", "📂 Upload Padrão"], horizontal=True)
     st.markdown("---")
@@ -289,31 +286,32 @@ with tab_input:
             up = st.file_uploader("Upload .csv", type=['csv'])
             if up: processar_upload(pd.read_csv(up))
     else:
-        # HELPERS DE INPUT VISUAL
-        def input_box(key, label, desc, fmt="%.0f"):
+        # HELPERS DE INPUT (CORRIGIDOS PARA ACEITAR ZERO E EDICAO LIVRE)
+        def input_box(key, label, desc, fmt="%.2f", step=0.01, min_val=0.0):
             st.markdown(f"""
             <div class='input-card'>
                 <div class='input-title'>{label}</div>
                 <div class='input-desc'>{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.session_state[key] = st.number_input(label, value=st.session_state[key], format=fmt, label_visibility="collapsed")
+            # Use o argumento KEY para binding direto. Min Value 0.0 permite zero.
+            st.number_input(label, key=key, format=fmt, step=step, min_value=min_val, label_visibility="collapsed")
 
         c1, c2, c3 = st.columns(3)
         with c1:
             st.subheader("1. Growth")
-            input_box('cli_ini', "Clientes Iniciais", "Quantos clientes ativos começam no Mês 1.")
-            input_box('cresc', "Crescimento Mensal (%)", "Taxa de novos clientes (Growth).", "%.2f")
-            input_box('churn', "Churn Rate (%)", "Percentual da base que cancela mensalmente.", "%.2f")
-            input_box('ticket', "Ticket Médio (R$)", "Valor médio da assinatura por cliente.")
-            input_box('upsell', "Upsell (% da Rec.)", "Vendas adicionais na base atual.", "%.2f")
+            input_box('cli_ini', "Clientes Iniciais", "Base inicial de clientes ativos (Mês 0).", "%.0f", 1.0)
+            input_box('cresc', "Crescimento Mensal (%)", "Taxa esperada de novos clientes.", "%.2f", 0.01)
+            input_box('churn', "Churn Rate (%)", "Percentual de cancelamento mensal.", "%.2f", 0.01)
+            input_box('ticket', "Ticket Médio (R$)", "Valor médio da assinatura mensal.", "%.2f", 1.0)
+            input_box('upsell', "Upsell (% da Rec.)", "Vendas adicionais na base atual.", "%.2f", 0.01)
         
         with c2:
             st.subheader("2. Custos Variáveis")
-            input_box('cogs', "COGS Unitário (R$)", "Custo direto de nuvem/licença por cliente.")
-            input_box('comissao', "Comissão (%)", "% sobre Vendas paga a terceiros.", "%.2f")
-            input_box('imposto', "Simples Nacional (%)", "Alíquota efetiva do imposto.", "%.2f")
-            input_box('taxa', "Taxa Meios Pagto (%)", "Taxa do gateway (Stripe/Boleto).", "%.2f")
+            input_box('cogs', "COGS Unitário (R$)", "Custo direto (Cloud/Licença) por cliente.")
+            input_box('comissao', "Comissão (%)", "% sobre Vendas paga a terceiros.")
+            input_box('imposto', "Simples Nacional (%)", "Alíquota sobre nota fiscal.")
+            input_box('taxa', "Taxa Meios Pagto (%)", "Taxa do gateway (Stripe/Boleto).")
             st.markdown("<br>", unsafe_allow_html=True)
             st.subheader("3. Fixos Gerais")
             input_box('mkt', "Budget Mkt (R$)", "Verba fixa mensal para Marketing.")
@@ -324,20 +322,21 @@ with tab_input:
             with st.expander("Detalhamento Salários", expanded=True):
                 c_s, c_q = st.columns([2,1])
                 with c_s:
-                    st.session_state['s_socio'] = st.number_input("Sal. Sócio", st.session_state['s_socio'])
-                    st.session_state['s_dev'] = st.number_input("Sal. Dev", st.session_state['s_dev'])
-                    st.session_state['s_cs'] = st.number_input("Sal. CS", st.session_state['s_cs'])
-                    st.session_state['s_venda'] = st.number_input("Sal. Venda", st.session_state['s_venda'])
+                    st.number_input("Sal. Sócio", key='s_socio', step=100.0)
+                    st.number_input("Sal. Dev", key='s_dev', step=100.0)
+                    st.number_input("Sal. CS", key='s_cs', step=100.0)
+                    st.number_input("Sal. Venda", key='s_venda', step=100.0)
                 with c_q:
-                    st.session_state['q_socio'] = st.number_input("Qtd", st.session_state['q_socio'], key="k1")
-                    st.session_state['q_dev'] = st.number_input("Qtd", st.session_state['q_dev'], key="k2")
-                    st.session_state['q_cs'] = st.number_input("Qtd", st.session_state['q_cs'], key="k3")
-                    st.session_state['q_venda'] = st.number_input("Qtd", st.session_state['q_venda'], key="k4")
+                    st.number_input("Qtd", key='q_socio', min_value=0, step=1)
+                    st.number_input("Qtd", key='q_dev', min_value=0, step=1)
+                    st.number_input("Qtd", key='q_cs', min_value=0, step=1)
+                    st.number_input("Qtd", key='q_venda', min_value=0, step=1)
             
-            input_box('encargos', "Encargos Folha (%)", "FGTS, Férias, 13º (Simples ~35%).", "%.2f")
+            input_box('encargos', "Encargos Folha (%)", "FGTS, Férias, 13º (Simples ~35%).")
             input_box('deprec', "Depreciação (R$)", "Perda valor equip. (Notebooks).")
             input_box('amort', "Amortização (R$)", "Perda valor intangível (Software).")
-            input_box('fin', "Res. Financeiro (R$)", "Rendimentos (+) ou Juros Pagos (-).")
+            # Fin pode ser negativo, entao min_val=None
+            input_box('fin', "Res. Financeiro (R$)", "Rendimentos (+) ou Juros Pagos (-).", min_val=None)
 
 # --- ABA 4: GLOSSÁRIO ---
 with tab_gloss:
