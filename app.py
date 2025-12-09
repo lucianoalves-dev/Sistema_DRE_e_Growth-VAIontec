@@ -50,6 +50,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 3. INICIALIZAÇÃO DE ESTADO (SESSION STATE) ---
+
+# Mapeamento corrigido com quebras de linha seguras
 key_map = {
     'cli_ini': 'Clientes Iniciais',
     'cresc': 'Crescimento Mensal (%)',
@@ -67,5 +69,232 @@ key_map = {
     'amort': 'Amortização (R$)',
     'fin': 'Resultado Financeiro (R$)',
     'irpj': 'IRPJ Extra (%)',
-    's_socio': 'Salário Sócio', 'q_socio': 'Qtd Sócios',
-    's_dev': 'Salário Dev', 'q_dev
+    's_socio': 'Salário Sócio', 
+    'q_socio': 'Qtd Sócios',
+    's_dev': 'Salário Dev', 
+    'q_dev': 'Qtd Devs',
+    's_cs': 'Salário CS', 
+    'q_cs': 'Qtd CS',
+    's_venda': 'Salário Vendas', 
+    'q_venda': 'Qtd Vendas'
+}
+
+defaults = {
+    'cli_ini': 50, 'cresc': 0.10, 'churn': 0.03, 'ticket': 500.0, 'upsell': 0.05,
+    'cogs': 30.0, 'comissao': 0.05, 'imposto': 0.06, 'taxa': 0.02,
+    'mkt': 5000.0, 'outros': 3000.0, 'encargos': 0.35,
+    'deprec': 400.0, 'amort': 600.0, 'fin': 0.0, 'irpj': 0.0,
+    's_socio': 8000.0, 'q_socio': 2,
+    's_dev': 5000.0, 'q_dev': 2,
+    's_cs': 2500.0, 'q_cs': 1,
+    's_venda': 3000.0, 'q_venda': 1
+}
+
+for key, val in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
+
+# --- 4. FUNÇÕES AUXILIARES ---
+
+def gerar_template_csv():
+    data = []
+    for k, v in defaults.items():
+        val_atual = st.session_state[k]
+        nome_legivel = key_map.get(k, k)
+        data.append({'Parametro': nome_legivel, 'Valor': val_atual, 'Codigo_Interno': k})
+    return pd.DataFrame(data)
+
+def processar_upload(df_upload):
+    try:
+        updates = {}
+        for index, row in df_upload.iterrows():
+            codigo = row.get('Codigo_Interno')
+            valor = row['Valor']
+            if codigo and codigo in defaults:
+                updates[codigo] = valor
+        
+        for k, v in updates.items():
+            st.session_state[k] = float(v)
+        
+        st.toast("✅ Dados atualizados com sucesso via Upload!", icon="🚀")
+    except Exception as e:
+        st.error(f"Erro ao processar arquivo: {e}")
+
+def calcular_dre():
+    s = st.session_state
+    meses = list(range(1, 13))
+    dados = []
+    
+    cli_atual = s['cli_ini']
+    custo_folha_base = (s['s_socio']*s['q_socio']) + (s['s_dev']*s['q_dev']) + (s['s_cs']*s['q_cs']) + (s['s_venda']*s['q_venda'])
+    nrr_rate = 1 + s['upsell'] - s['churn']
+
+    for m in meses:
+        # Growth
+        novos = int(cli_atual * s['cresc'])
+        perda = int(cli_atual * s['churn'])
+        cli_fim = cli_atual + novos - perda
+        
+        # Receita
+        mrr = cli_fim * s['ticket']
+        expansao = mrr * s['upsell']
+        rec_bruta = mrr + expansao
+        
+        # Custos
+        imp = rec_bruta * s['imposto']
+        rec_liq = rec_bruta - imp
+        cogs = cli_fim * s['cogs']
+        comissao = rec_bruta * s['comissao']
+        taxa = rec_bruta * s['taxa']
+        
+        margem_cont = rec_liq - (cogs + comissao + taxa)
+        mc_pct = margem_cont / rec_liq if rec_liq > 0 else 0
+        
+        # Fixos
+        encargos = custo_folha_base * s['encargos']
+        folha_total = custo_folha_base + encargos
+        desp_op = folha_total + s['mkt'] + s['outros']
+        
+        # Resultados
+        ebitda = margem_cont - desp_op
+        ebit = ebitda - (s['deprec'] + s['amort'])
+        lair = ebit + s['fin']
+        irpj = lair * s['irpj'] if lair > 0 else 0
+        lucro = lair - irpj
+        
+        # KPIs
+        fator_r = folha_total / rec_bruta if rec_bruta > 0 else 0
+        
+        fixos_totais_pe = desp_op + s['deprec'] + s['amort'] - s['fin']
+        mb_pct = margem_cont / rec_bruta if rec_bruta > 0 else 0
+        pe_val = fixos_totais_pe / mb_pct if mb_pct > 0 else 0
+        
+        cac = (s['mkt'] + comissao) / novos if novos > 0 else 0
+        ltv = (s['ticket'] * mc_pct) / s['churn'] if s['churn'] > 0 else 0
+        payback = cac / (s['ticket'] * mc_pct) if (s['ticket'] * mc_pct) > 0 else 0
+        
+        dados.append({
+            'Mês': m,
+            'Clientes': cli_fim,
+            'Novos': novos,
+            'Churn': perda,
+            'MRR': mrr,
+            'Receita Bruta': rec_bruta,
+            'Receita Líquida': rec_liq,
+            'COGS': cogs,
+            'Margem Contrib.': margem_cont,
+            'EBITDA': ebitda,
+            'Lucro Líquido': lucro,
+            'Ponto Equilíbrio': pe_val,
+            'Fator R': fator_r,
+            'CAC': cac,
+            'LTV': ltv,
+            'Payback': payback,
+            'NRR Estimado': nrr_rate,
+            'Folha Total': folha_total
+        })
+        cli_atual = cli_fim
+        
+    return pd.DataFrame(dados)
+
+# --- 5. INTERFACE DO USUÁRIO ---
+
+# Header
+c1, c2 = st.columns([0.5, 5])
+with c1: st.markdown("# 💎")
+with c2: 
+    st.markdown("## Vaiontec | Sistema de Gestão Financeira")
+    st.caption("Environment: Production | Mode: Executive View")
+
+# Menu de Abas
+tab_dash, tab_dre, tab_input, tab_gloss = st.tabs([
+    "📊 Dashboard", 
+    "📑 Relatório DRE", 
+    "⚙️ Atualizar Dados (Manual/Upload)", 
+    "📚 Glossário"
+])
+
+# --- ABA 1: DASHBOARD ---
+df = calcular_dre()
+f = df.iloc[-1] # Dados do mês 12
+
+with tab_dash:
+    def card(label, value, sub, color="neutral", is_money=True):
+        fmt_val = f"R$ {value:,.2f}" if is_money else f"{value}"
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{fmt_val}</div>
+            <div class="metric-sub sub-{color}">{sub}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # LINHA 1
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: card("Faturamento Mensal (Bruto)", f['Receita Bruta'], f"Projeção Mês 12", "neutral")
+    with c2: card("Base de Clientes Ativos", int(f['Clientes']), f"Novos: +{int(f['Novos'])} este mês", "neutral", is_money=False)
+    with c3:
+        cor = "good" if f['Lucro Líquido'] > 0 else "bad"
+        card("Lucro Líquido", f['Lucro Líquido'], f"Margem Líq: {(f['Lucro Líquido']/f['Receita Bruta'])*100:.1f}%", cor)
+    with c4: card("Ponto de Equilíbrio (Meta)", f['Ponto Equilíbrio'], "Necessário para zerar custos", "neutral")
+
+    # LINHA 2
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: card("LTV (Valor Vitalício)", f['LTV'], "Lucro por cliente")
+    with c2: card("CAC (Custo Aquisição)", f['CAC'], "Mkt + Comissões")
+    with c3: card("Payback (Retorno)", f"{f['Payback']:.1f} Meses", "Meta < 12 meses", "good" if f['Payback']<12 else "bad", is_money=False)
+    with c4: card("Fator R (Imposto)", f"{f['Fator R']*100:.1f}%", "Anexo III (>28%)" if f['Fator R']>=0.28 else "Anexo V (Alerta)", "good" if f['Fator R']>=0.28 else "bad", is_money=False)
+
+    st.markdown("---")
+    
+    # GRÁFICOS
+    g1, g2 = st.columns([2, 1])
+    with g1:
+        st.subheader("Evolução: Faturamento vs Ponto de Equilíbrio")
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=df['Mês'], y=df['Receita Bruta'], name='Faturamento', marker_color='#1f497d'))
+        fig.add_trace(go.Scatter(x=df['Mês'], y=df['Ponto Equilíbrio'], name='Ponto de Equilíbrio', line=dict(color='#e74c3c', width=3, dash='dot')))
+        fig.add_trace(go.Scatter(x=df['Mês'], y=df['Lucro Líquido'], name='Lucro/Prejuízo', line=dict(color='#2ecc71', width=3)))
+        fig.update_layout(template="plotly_white", height=400, margin=dict(t=30), legend=dict(orientation="h", y=1.1))
+        st.plotly_chart(fig, use_container_width=True)
+        
+    with g2:
+        st.subheader("Unit Economics")
+        fig_u = go.Figure()
+        fig_u.add_trace(go.Bar(name='CAC', x=df['Mês'], y=df['CAC'], marker_color='#e67e22'))
+        fig_u.add_trace(go.Bar(name='LTV', x=df['Mês'], y=df['LTV'], marker_color='#2980b9'))
+        fig_u.update_layout(barmode='group', template="plotly_white", height=400, margin=dict(t=30), legend=dict(orientation="h", y=1.1))
+        st.plotly_chart(fig_u, use_container_width=True)
+
+# --- ABA 2: DRE ---
+with tab_dre:
+    st.markdown("### 📑 Detalhamento Financeiro")
+    
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Baixar DRE Completo (.csv)", data=csv, file_name="Vaiontec_DRE_Full.csv", mime="text/csv")
+    
+    df_show = df.copy()
+    format_money = lambda x: f"R$ {x:,.2f}"
+    format_pct = lambda x: f"{x*100:.1f}%"
+    
+    cols_money = [
+        'MRR', 'Receita Bruta', 'Receita Líquida', 'COGS', 
+        'Margem Contrib.', 'EBITDA', 'Lucro Líquido', 
+        'Ponto Equilíbrio', 'CAC', 'LTV'
+    ]
+    
+    for c in cols_money: df_show[c] = df_show[c].apply(format_money)
+    
+    df_show['Fator R'] = df_show['Fator R'].apply(format_pct)
+    df_show['NRR Estimado'] = df_show['NRR Estimado'].apply(format_pct)
+    
+    st.dataframe(df_show, use_container_width=True, height=600)
+
+# --- ABA 3: INPUTS ---
+with tab_input:
+    st.markdown("### ⚙️ Centro de Atualização de Dados")
+    
+    modo = st.radio("Como deseja atualizar?", ["📝 Edição Manual", "📂 Upload de Planilha Padrão"], horizontal=True)
+    st.markdown("---")
+
+    if modo == "📂 Upload de
