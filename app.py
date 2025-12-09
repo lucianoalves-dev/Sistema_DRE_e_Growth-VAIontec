@@ -25,106 +25,114 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] { background-color: white; border-radius: 6px; padding: 10px 20px; color: #555; border: 1px solid #ddd;}
         .stTabs [aria-selected="true"] { background-color: #1f497d !important; color: white !important; border: none;}
         
-        /* Estilo do Glossário */
-        .glossary-card { background-color: white; padding: 20px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 10px; }
-        .glossary-term { color: #1f497d; font-size: 18px; font-weight: bold; }
-        .glossary-desc { color: #555; margin-top: 5px; margin-bottom: 10px; line-height: 1.5; }
-        .formula-box { background-color: #f8f9fa; padding: 10px; border-radius: 4px; border-left: 3px solid #e67e22; font-family: monospace; }
+        /* Glossário Estilizado */
+        .glossary-card { 
+            background-color: white; 
+            padding: 25px; 
+            border-radius: 8px; 
+            border-left: 5px solid #2980b9;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px; 
+        }
+        .glossary-term { color: #1f497d; font-size: 20px; font-weight: 800; margin-bottom: 5px;}
+        .glossary-cat { background-color: #eef2f7; color: #555; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+        .glossary-desc { color: #444; font-size: 16px; margin-top: 10px; line-height: 1.6; }
+        .glossary-tip { background-color: #fff8e1; color: #856404; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 14px; border: 1px solid #ffeeba; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. DADOS DO GLOSSÁRIO (BASE DE CONHECIMENTO) ---
+# --- 3. DADOS DO GLOSSÁRIO (HUMANIZADO) ---
 GLOSSARIO_DB = [
     {
-        "termo": "MRR (Monthly Recurring Revenue)",
+        "termo": "MRR (Receita Recorrente Mensal)",
         "categoria": "Receita",
-        "conceito": "A soma de todas as receitas de assinatura que se repetem mensalmente. É o principal indicador de tamanho de uma empresa SaaS.",
-        "formula": r"MRR = \sum (\text{Clientes Ativos} \times \text{Valor da Assinatura})",
-        "interpretacao": "Se o MRR cresce, a empresa está saudável. Quedas indicam Churn alto ou falta de vendas."
+        "conceito": "É a soma de todas as assinaturas ativas que você recebe todo mês. É o 'salário' da empresa.",
+        "formula": r"\text{Clientes Ativos} \times \text{Valor da Assinatura}",
+        "interpretacao": "Se o gráfico do MRR aponta para cima, a empresa está saudável. Se aponta para baixo, você está perdendo clientes mais rápido do que ganha."
     },
     {
-        "termo": "ARR (Annual Recurring Revenue)",
+        "termo": "ARR (Receita Recorrente Anual)",
         "categoria": "Receita",
-        "conceito": "A projeção anualizada do seu faturamento recorrente. Usado para Valuation (avaliação de valor de venda da empresa).",
-        "formula": r"ARR = MRR \times 12",
-        "interpretacao": "Investidores usam múltiplos de ARR para definir quanto vale sua startup (Ex: 5x ARR)."
+        "conceito": "É uma projeção simples: se você não vendesse mais nada e ninguém cancelasse, quanto faturaria em um ano?",
+        "formula": r"\text{MRR} \times 12 \text{ Meses}",
+        "interpretacao": "Investidores amam esse número. Uma startup de SaaS geralmente é vendida por um múltiplo desse valor (ex: 'Valemos 5 vezes o nosso ARR')."
     },
     {
-        "termo": "NRR (Net Revenue Retention)",
+        "termo": "NRR (Retenção Líquida de Receita)",
         "categoria": "Growth",
-        "conceito": "Mede a capacidade da empresa de reter e expandir a receita da base de clientes existente, descontando cancelamentos.",
-        "formula": r"NRR = \frac{(\text{Receita Inicial} + \text{Upsell} - \text{Churn})}{\text{Receita Inicial}} \times 100",
-        "interpretacao": "Acima de 100%: A empresa cresce mesmo sem vender para novos clientes (Upsell > Churn). Abaixo de 100%: A empresa está 'vazando' dinheiro."
+        "conceito": "Responde à pergunta: 'Da receita que eu tinha mês passado, quanto sobrou?'. Ele desconta quem cancelou e soma quem comprou mais (upsell).",
+        "formula": r"\frac{\text{Receita Inicial} + \text{Vendas Extra (Upsell)} - \text{Cancelamentos}}{\text{Receita Inicial}}",
+        "interpretacao": "Acima de 100%: Fenomenal. Significa que mesmo se você parar de vender para novos clientes, a empresa cresce sozinha. Abaixo de 100%: Atenção, o balde está furado."
     },
     {
-        "termo": "CAC (Custo de Aquisição de Cliente)",
+        "termo": "CAC (Custo de Aquisição)",
         "categoria": "Eficiência",
-        "conceito": "Quanto dinheiro você gasta em Marketing e Vendas para conquistar 1 novo cliente pagante.",
-        "formula": r"CAC = \frac{\text{Investimento em Mkt} + \text{Salários Vendas} + \text{Comissões}}{\text{Número de Novos Clientes}}",
-        "interpretacao": "Quanto menor, melhor. Se o CAC for maior que o LTV, o modelo de negócio é inviável."
+        "conceito": "Quanto dinheiro sai do seu bolso (em anúncios, comissões e salários de vendas) para convencer 1 pessoa a virar cliente.",
+        "formula": r"\frac{\text{Gasto Marketing} + \text{Comissões} + \text{Salários Vendas}}{\text{Novos Clientes Conquistados}}",
+        "interpretacao": "Se seu cliente paga R$ 500,00 e seu CAC é R$ 2.000,00, você tem um problema de fluxo de caixa, pois ele demora 4 meses só para pagar o custo de entrada."
     },
     {
-        "termo": "LTV (Lifetime Value)",
+        "termo": "LTV (Valor Vitalício)",
         "categoria": "Eficiência",
-        "conceito": "O lucro bruto total que um cliente gera para a empresa durante todo o tempo que permanece assinante.",
-        "formula": r"LTV = \frac{\text{Ticket Médio} \times \text{Margem de Contribuição \%}}{\text{Churn Rate \%}}",
-        "interpretacao": "Indica o teto do quanto você pode gastar para adquirir um cliente."
+        "conceito": "É o lucro total estimado que um único cliente deixa na empresa desde o dia que entra até o dia que sai.",
+        "formula": r"\frac{\text{Ticket Médio} \times \text{Margem de Contribuição \%}}{\text{Taxa de Cancelamento (Churn)}}",
+        "interpretacao": "Este número deve ser sempre MUITO maior que o CAC. Se o LTV for baixo, você está pagando caro para trazer clientes que valem pouco."
     },
     {
         "termo": "Relação LTV / CAC",
         "categoria": "Eficiência",
-        "conceito": "O 'Santo Graal' do SaaS. Mede o retorno sobre o investimento de aquisição.",
-        "formula": r"Ratio = \frac{LTV}{CAC}",
-        "interpretacao": "Ideal: > 3x (A cada R$1 gasto, voltam R$3). Se < 1x, você perde dinheiro vendendo."
+        "conceito": "O termômetro de saúde do crescimento. Mede se vale a pena acelerar o marketing.",
+        "formula": r"\frac{\text{LTV (Quanto o cliente rende)}}{\text{CAC (Quanto custa trazer ele)}}",
+        "interpretacao": "O número mágico é 3. Significa que a cada R$ 1,00 que você investe em marketing, voltam R$ 3,00 de lucro ao longo do tempo."
     },
     {
-        "termo": "Payback Period",
+        "termo": "Payback (Tempo de Retorno)",
         "categoria": "Eficiência",
-        "conceito": "O tempo (em meses) que leva para recuperar o dinheiro gasto (CAC) para trazer o cliente.",
-        "formula": r"Payback = \frac{CAC}{\text{Ticket Médio} \times \text{Margem Contribuição \%}}",
-        "interpretacao": "Ideal: Menor que 12 meses. Se for muito longo, a empresa precisa de muito caixa para crescer."
+        "conceito": "Quantos meses o cliente precisa pagar a mensalidade para 'cobrir' o custo que você teve para trazê-lo (CAC).",
+        "formula": r"\frac{\text{Custo de Aquisição (CAC)}}{\text{Ticket Médio} \times \text{Margem de Contribuição}}",
+        "interpretacao": "Quanto menor, melhor. Idealmente menos de 12 meses. Se for 18 meses, significa que você financia o cliente por 1 ano e meio antes de ter lucro real."
     },
     {
-        "termo": "Churn Rate",
+        "termo": "Churn Rate (Taxa de Cancelamento)",
         "categoria": "Growth",
-        "conceito": "A taxa de cancelamento. Pode ser medida em número de clientes (Logo Churn) ou em dinheiro (Revenue Churn).",
-        "formula": r"Churn \% = \frac{\text{Clientes Cancelados no Mês}}{\text{Clientes no Início do Mês}}",
-        "interpretacao": "O 'furo no balde'. Churn alto mata o crescimento composto. Ideal em SaaS B2B: < 1% ao mês."
+        "conceito": "A porcentagem da sua base de clientes que decide ir embora todo mês.",
+        "formula": r"\frac{\text{Clientes que Cancelaram}}{\text{Total de Clientes no Início do Mês}}",
+        "interpretacao": "O inimigo número 1 do SaaS. Um churn de 3% ao mês parece pouco, mas destrói 30% da sua base em um ano."
     },
     {
-        "termo": "COGS (Cost of Goods Sold)",
+        "termo": "COGS (Custo do Serviço)",
         "categoria": "Custos",
-        "conceito": "Custo das Mercadorias/Serviços Vendidos. Em software, refere-se aos custos de infraestrutura (servidores), licenças embarcadas e suporte direto.",
-        "formula": r"COGS = \text{Servidores Cloud} + \text{APIs de Terceiros} + \text{Equipe Suporte N1}",
-        "interpretacao": "Quanto menor o COGS, maior a Margem Bruta. SaaS de excelência tem Margem Bruta > 80%."
+        "conceito": "Custo direto para o sistema funcionar. Se você tiver zero clientes, esse custo deve ser quase zero.",
+        "formula": r"\text{Servidores (AWS)} + \text{Licenças por Usuário} + \text{Equipe de Suporte}",
+        "interpretacao": "Não confunda com despesa fixa (aluguel). O COGS sobe junto com as vendas. Manter ele baixo garante que sobra mais dinheiro (Margem) para investir."
     },
     {
         "termo": "Margem de Contribuição",
         "categoria": "Resultados",
-        "conceito": "O valor que sobra da receita de vendas após pagar os custos variáveis (Impostos + COGS + Comissões).",
-        "formula": r"MC = \text{Receita Líquida} - (\text{COGS} + \text{Comissões} + \text{Impostos Variáveis})",
-        "interpretacao": "É o dinheiro que sobra para pagar as contas fixas (aluguel, salários) e gerar lucro."
+        "conceito": "É o dinheiro que sobra 'limpo' de cada venda depois de pagar os impostos e o custo do serviço (COGS).",
+        "formula": r"\text{Receita} - (\text{Impostos} + \text{COGS} + \text{Comissões})",
+        "interpretacao": "É com esse dinheiro que você paga o aluguel, a luz e o salário da diretoria. Se a margem for negativa, quanto mais você vende, mais prejuízo tem."
     },
     {
         "termo": "Ponto de Equilíbrio (Break-Even)",
         "categoria": "Resultados",
-        "conceito": "O momento ou valor de faturamento onde a empresa não tem nem lucro nem prejuízo.",
-        "formula": r"PE (R\$) = \frac{\text{Custos Fixos Totais}}{\text{Margem de Contribuição \%}}",
-        "interpretacao": "Abaixo desse valor, a empresa queima caixa. Acima, gera lucro."
+        "conceito": "A meta mínima de faturamento para não ter prejuízo. É o empate: 0x0.",
+        "formula": r"\frac{\text{Custos Fixos Totais (Aluguel, Folha, etc)}}{\text{Margem de Contribuição \%}}",
+        "interpretacao": "Sua primeira missão no mês é bater essa meta. Tudo que vender acima disso vira lucro líquido."
     },
     {
-        "termo": "EBITDA (LAJIDA)",
+        "termo": "EBITDA",
         "categoria": "Resultados",
-        "conceito": "Lucro Antes de Juros, Impostos, Depreciação e Amortização. Mede a geração de caixa operacional pura.",
-        "formula": r"EBITDA = \text{Margem Contribuição} - \text{Despesas Operacionais (OpEx)}",
-        "interpretacao": "Melhor indicador para comparar a eficiência operacional de empresas diferentes, ignorando dívidas e impostos."
+        "conceito": "É o Lucro Operacional bruto. Mostra se a operação da empresa é eficiente, ignorando juros bancários e impostos de renda.",
+        "formula": r"\text{Margem de Contribuição} - \text{Despesas Operacionais (OpEx)}",
+        "interpretacao": "Se o EBITDA é positivo, o negócio é viável operacionalmente. Se for negativo, a operação queima caixa estruturalmente."
     },
     {
         "termo": "Fator R",
         "categoria": "Tributário",
-        "conceito": "Regra do Simples Nacional que define a alíquota de imposto baseada na folha de pagamento.",
-        "formula": r"Fator R = \frac{\text{Folha de Pagamento (12 meses)}}{\text{Faturamento Bruto (12 meses)}}",
-        "interpretacao": "Se > 28%: Anexo III (Imposto ~6%). Se < 28%: Anexo V (Imposto ~15.5%). Fundamental monitorar mensalmente."
+        "conceito": "Uma 'pegadinha' do governo para empresas de tecnologia no Simples Nacional.",
+        "formula": r"\frac{\text{Folha de Pagamento (incluindo Sócios)}}{\text{Faturamento Bruto}}",
+        "interpretacao": "Você DEVE manter essa divisão acima de 0,28 (28%). Se cair abaixo disso, seu imposto pula de ~6% para ~15%. Aumente o pró-labore se necessário."
     }
 ]
 
@@ -137,8 +145,6 @@ defaults = {
     's_socio': 8000.0, 'q_socio': 2, 's_dev': 5000.0, 'q_dev': 2,
     's_cs': 2500.0, 'q_cs': 1, 's_venda': 3000.0, 'q_venda': 1
 }
-
-# Mapping para CSV
 key_map = {
     'cli_ini': 'Clientes Iniciais', 'cresc': 'Crescimento Mensal (%)', 'churn': 'Churn Rate (%)',
     'ticket': 'Ticket Médio (R$)', 'upsell': 'Upsell (% MRR)', 'cogs': 'COGS Unitário (R$)',
@@ -148,7 +154,6 @@ key_map = {
     's_socio': 'Sal. Sócio', 'q_socio': 'Qtd Sócio', 's_dev': 'Sal. Dev', 'q_dev': 'Qtd Dev',
     's_cs': 'Sal. CS', 'q_cs': 'Qtd CS', 's_venda': 'Sal. Venda', 'q_venda': 'Qtd Venda'
 }
-
 for key, val in defaults.items():
     if key not in st.session_state: st.session_state[key] = val
 
@@ -171,37 +176,29 @@ def calcular_dre():
     s = st.session_state
     meses = list(range(1, 13))
     dados = []
-    
     cli = s['cli_ini']
     folha_base = (s['s_socio']*s['q_socio']) + (s['s_dev']*s['q_dev']) + (s['s_cs']*s['q_cs']) + (s['s_venda']*s['q_venda'])
     nrr = 1 + s['upsell'] - s['churn']
-
     for m in meses:
         novos = int(cli * s['cresc'])
         perda = int(cli * s['churn'])
         fim = cli + novos - perda
-        
         mrr = fim * s['ticket']
         rec_bruta = mrr * (1 + s['upsell'])
         rec_liq = rec_bruta * (1 - s['imposto'])
-        
         var_total = (fim * s['cogs']) + (rec_bruta * s['comissao']) + (rec_bruta * s['taxa'])
         margem = rec_liq - var_total
-        
         folha_tot = folha_base * (1 + s['encargos'])
         fixos = folha_tot + s['mkt'] + s['outros']
-        
         ebitda = margem - fixos
         ebit = ebitda - (s['deprec'] + s['amort'])
         lair = ebit + s['fin']
         lucro = lair * (1 - s['irpj']) if lair > 0 else lair
-        
         fator_r = folha_tot / rec_bruta if rec_bruta > 0 else 0
         pe_val = (fixos + s['deprec'] + s['amort'] - s['fin']) / (margem/rec_bruta) if rec_bruta > 0 else 0
         cac = (s['mkt'] + (rec_bruta * s['comissao'])) / novos if novos > 0 else 0
         ltv = (s['ticket'] * (margem/rec_liq)) / s['churn'] if s['churn'] > 0 else 0
         payback = cac / (s['ticket'] * (margem/rec_liq)) if (s['ticket'] * (margem/rec_liq)) > 0 else 0
-        
         dados.append({
             'Mês': m, 'Clientes': fim, 'Novos': novos, 'Receita Bruta': rec_bruta,
             'Receita Líquida': rec_liq, 'COGS': fim*s['cogs'], 'Margem Contrib.': margem,
@@ -229,19 +226,16 @@ with tab_dash:
         v_str = f"R$ {val:,.2f}" if money else f"{val}"
         st.markdown(f"""<div class="metric-container"><div class="metric-label">{label}</div>
         <div class="metric-value">{v_str}</div><div class="metric-sub sub-{color}">{sub}</div></div>""", unsafe_allow_html=True)
-
     c1, c2, c3, c4 = st.columns(4)
     with c1: card("Faturamento Mensal", f['Receita Bruta'], "Projeção Mês 12", "neutral")
     with c2: card("Clientes Ativos", int(f['Clientes']), f"+{int(f['Novos'])} novos", "neutral", False)
     with c3: card("Lucro Líquido", f['Lucro Líquido'], f"Margem: {(f['Lucro Líquido']/f['Receita Bruta'])*100:.1f}%", "good" if f['Lucro Líquido']>0 else "bad")
     with c4: card("Ponto de Equilíbrio", f['Ponto Equilíbrio'], "Necessário para zerar", "neutral")
-
     c1, c2, c3, c4 = st.columns(4)
     with c1: card("LTV", f['LTV'], "Lucro Vitalício")
     with c2: card("CAC", f['CAC'], "Custo Aquisição")
     with c3: card("Payback", f"{f['Payback']:.1f} Meses", "Meta < 12", "good" if f['Payback']<12 else "bad", False)
     with c4: card("Fator R", f"{f['Fator R']*100:.1f}%", "Anexo III (>28%)" if f['Fator R']>=0.28 else "Anexo V", "good" if f['Fator R']>=0.28 else "bad", False)
-
     st.markdown("---")
     g1, g2 = st.columns([2, 1])
     with g1:
@@ -315,25 +309,19 @@ with tab_input:
             st.session_state['fin'] = st.number_input("Res. Fin (R$)", st.session_state['fin'])
 
 with tab_gloss:
-    st.markdown("### 🔍 Pesquisar Conceito")
-    search_term = st.text_input("Digite um termo (ex: Lucro, CAC, Churn)", "").lower()
-    
+    st.markdown("### 🔍 Pesquisar na Base de Conhecimento")
+    search = st.text_input("Digite um termo (Ex: Lucro, Churn, CAC)...", "").lower()
     st.markdown("---")
-    
     found = False
     for item in GLOSSARIO_DB:
-        if search_term in item['termo'].lower() or search_term in item['conceito'].lower():
+        if search in item['termo'].lower() or search in item['conceito'].lower() or search == "":
             found = True
             st.markdown(f"""
             <div class="glossary-card">
-                <div class="glossary-term">{item['termo']} <span style="font-size:12px; color:#999">({item['categoria']})</span></div>
+                <div class="glossary-term">{item['termo']} <span class="glossary-cat">{item['categoria']}</span></div>
                 <div class="glossary-desc">{item['conceito']}</div>
-                <div class="formula-box">{item['formula']}</div>
-                <div class="glossary-desc" style="margin-top:10px"><i>💡 {item['interpretacao']}</i></div>
+                <div class="glossary-desc"><i>💡 {item['interpretacao']}</i></div>
             </div>
             """, unsafe_allow_html=True)
-            
-    if not found and search_term:
-        st.warning("Nenhum termo encontrado.")
-    if not search_term:
-        st.caption("Mostrando todos os termos disponíveis.")
+            st.latex(item['formula'])
+    if not found: st.warning("Nenhum termo encontrado.")
