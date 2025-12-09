@@ -6,13 +6,11 @@ import io
 # --- 1. CONFIGURAÇÃO ---
 st.set_page_config(page_title="Vaiontec | CFO Suite", layout="wide", page_icon="💎", initial_sidebar_state="collapsed")
 
-# --- 2. CSS (CORPORATE BLUE + INPUTS ESTILIZADOS) ---
+# --- 2. CSS (CORPORATE BLUE + INPUTS) ---
 st.markdown("""
     <style>
         [data-testid="stAppViewContainer"] { background-color: #f4f7f6; color: #0f2a4a; }
         [data-testid="stHeader"] { background-color: transparent; }
-        
-        /* KPI CARDS */
         .metric-container {
             background-color: white; padding: 18px; border-radius: 8px;
             border-left: 5px solid #1f497d; box-shadow: 0 2px 4px rgba(0,0,0,0.08); margin-bottom: 10px;
@@ -21,34 +19,17 @@ st.markdown("""
         .metric-value { font-size: 24px; color: #1f497d; font-weight: 800; margin: 5px 0; }
         .metric-sub { font-size: 12px; font-weight: 500; }
         .sub-good { color: #218838; } .sub-bad { color: #c82333; } .sub-neutral { color: #6c757d; }
-        
-        /* TABELA DRE */
         [data-testid="stDataFrame"] { width: 100%; }
-        
-        /* BOTÕES */
         .stButton>button { background-color: #1f497d; color: white; border-radius: 4px; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;}
         .stButton>button:hover { background-color: #163a66; color: white; border-color: #163a66; }
-        
-        /* ABAS */
         .stTabs [data-baseweb="tab-list"] { gap: 5px; border-bottom: 2px solid #e9ecef; }
         .stTabs [data-baseweb="tab"] { background-color: white; border-radius: 4px 4px 0 0; padding: 10px 20px; color: #495057; border: 1px solid #e9ecef; border-bottom: none; }
         .stTabs [aria-selected="true"] { background-color: #1f497d !important; color: white !important; }
-        
-        /* GLOSSÁRIO CARD */
         .glossary-card { background-color: white; padding: 25px; border-radius: 8px; border-left: 5px solid #2980b9; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .glossary-term { color: #1f497d; font-size: 20px; font-weight: 800; margin-bottom: 5px;}
-        .glossary-cat { background-color: #eef2f7; color: #555; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
         .glossary-desc { color: #444; font-size: 16px; margin-top: 10px; line-height: 1.6; }
         .glossary-tip { background-color: #fff8e1; color: #856404; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 14px; border: 1px solid #ffeeba; }
-
-        /* INPUT CARD */
-        .input-card {
-            background-color: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            margin-bottom: 10px;
-        }
+        .input-card { background-color: white; padding: 15px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 10px; }
         .input-title { font-weight: 700; color: #1f497d; font-size: 14px; margin-bottom: 4px; }
         .input-desc { font-size: 12px; color: #666; margin-bottom: 8px; font-style: italic; min-height: 30px; line-height: 1.2; }
     </style>
@@ -56,48 +37,13 @@ st.markdown("""
 
 # --- 3. DADOS GLOSSÁRIO ---
 GLOSSARIO_DB = [
-    {
-        "termo": "MRR (Receita Recorrente Mensal)", "categoria": "Receita",
-        "conceito": "É a soma de todas as assinaturas ativas que você recebe todo mês. É o 'salário' da empresa.",
-        "formula": r"\text{Clientes Ativos} \times \text{Valor da Assinatura}",
-        "interpretacao": "Se o gráfico do MRR aponta para cima, a empresa está saudável."
-    },
-    {
-        "termo": "NRR (Retenção Líquida)", "categoria": "Growth",
-        "conceito": "Mede quanto da receita passada sobrou, descontando cancelamentos e somando upsells.",
-        "formula": r"\frac{\text{Receita Inicial} + \text{Upsell} - \text{Churn}}{\text{Receita Inicial}}",
-        "interpretacao": "> 100%: Crescimento orgânico sem novas vendas."
-    },
-    {
-        "termo": "CAC (Custo de Aquisição)", "categoria": "Eficiência",
-        "conceito": "Custo total de marketing e vendas para trazer 1 cliente.",
-        "formula": r"\frac{\text{Mkt} + \text{Comissões} + \text{Salários Vendas}}{\text{Novos Clientes}}",
-        "interpretacao": "Quanto menor, melhor."
-    },
-    {
-        "termo": "LTV (Valor Vitalício)", "categoria": "Eficiência",
-        "conceito": "Lucro total que um cliente deixa na empresa antes de sair.",
-        "formula": r"\frac{\text{Ticket Médio} \times \text{Margem Contrib \%}}{\text{Churn Rate}}",
-        "interpretacao": "Deve ser pelo menos 3x maior que o CAC."
-    },
-    {
-        "termo": "Payback", "categoria": "Eficiência",
-        "conceito": "Meses necessários para recuperar o CAC.",
-        "formula": r"\frac{\text{CAC}}{\text{Ticket} \times \text{Margem Contrib}}",
-        "interpretacao": "Ideal: Menos de 12 meses."
-    },
-    {
-        "termo": "Ponto de Equilíbrio", "categoria": "Resultado",
-        "conceito": "Faturamento necessário para zerar prejuízo (Lucro = 0).",
-        "formula": r"\frac{\text{Custos Fixos Totais}}{\text{Margem Contrib \%}}",
-        "interpretacao": "Sua meta mínima mensal de sobrevivência."
-    },
-    {
-        "termo": "Fator R", "categoria": "Tributário",
-        "conceito": "Razão Folha/Faturamento para definir anexo do Simples.",
-        "formula": r"\frac{\text{Folha Pagamento}}{\text{Faturamento Bruto}}",
-        "interpretacao": "Mantenha > 28% para pagar imposto reduzido (Anexo III)."
-    }
+    {"termo": "MRR (Receita Recorrente)", "categoria": "Receita", "conceito": "Soma das assinaturas ativas no mês.", "formula": r"\text{Clientes} \times \text{Ticket}", "interpretacao": "O pulso do SaaS."},
+    {"termo": "NRR (Retenção Líquida)", "categoria": "Growth", "conceito": "Receita retida + expansão - churn.", "formula": r"\frac{\text{Rec Inicial} + \text{Upsell} - \text{Churn}}{\text{Rec Inicial}}", "interpretacao": "> 100%: Crescimento orgânico."},
+    {"termo": "CAC", "categoria": "Eficiência", "conceito": "Custo total p/ trazer 1 cliente.", "formula": r"\frac{\text{Mkt} + \text{Vendas}}{\text{Novos Clientes}}", "interpretacao": "Quanto menor, melhor."},
+    {"termo": "LTV", "categoria": "Eficiência", "conceito": "Lucro total de um cliente na vida.", "formula": r"\frac{\text{Ticket} \times \text{Margem \%}}{\text{Churn Rate}}", "interpretacao": "Deve ser 3x maior que o CAC."},
+    {"termo": "Payback", "categoria": "Eficiência", "conceito": "Meses p/ recuperar o CAC.", "formula": r"\frac{\text{CAC}}{\text{Ticket} \times \text{Margem}}", "interpretacao": "Ideal < 12 meses."},
+    {"termo": "Ponto de Equilíbrio", "categoria": "Resultado", "conceito": "Faturamento para zerar custos.", "formula": r"\frac{\text{Custos Fixos}}{\text{Margem \%}}", "interpretacao": "Meta mínima mensal."},
+    {"termo": "Fator R", "categoria": "Tributário", "conceito": "Razão Folha/Fat para Simples Nacional.", "formula": r"\frac{\text{Folha}}{\text{Faturamento}}", "interpretacao": "Manter > 28% (Anexo III)."}
 ]
 
 # --- 4. ESTADO E DEFAULTS ---
@@ -157,6 +103,9 @@ def calcular_dre():
         var_total = (fim * s['cogs']) + (rec_bruta * s['comissao']) + (rec_bruta * s['taxa'])
         margem = rec_liq - var_total
         
+        # Proteção contra Divisão por Zero
+        mc_pct = margem / rec_liq if rec_liq > 0 else 0
+        
         folha_tot = folha_base * (1 + s['encargos'])
         fixos = folha_tot + s['mkt'] + s['outros']
         
@@ -165,11 +114,21 @@ def calcular_dre():
         lair = ebit + s['fin']
         lucro = lair * (1 - s['irpj']) if lair > 0 else lair
         
+        # KPIs com Proteção Matemática
         fator_r = folha_tot / rec_bruta if rec_bruta > 0 else 0
-        pe_val = (fixos + s['deprec'] + s['amort'] - s['fin']) / (margem/rec_bruta) if rec_bruta > 0 else 0
+        
+        fixos_totais_pe = fixos + s['deprec'] + s['amort'] - s['fin']
+        mb_pct = margem / rec_bruta if rec_bruta > 0 else 0 # Margem Bruta
+        pe_val = fixos_totais_pe / mb_pct if mb_pct > 0 else 0
+        
         cac = (s['mkt'] + (rec_bruta * s['comissao'])) / novos if novos > 0 else 0
-        ltv = (s['ticket'] * (margem/rec_liq)) / s['churn'] if s['churn'] > 0 else 0
-        payback = cac / (s['ticket'] * (margem/rec_liq)) if (s['ticket'] * (margem/rec_liq)) > 0 else 0
+        
+        # Proteção LTV: Ticket x Margem / Churn (Se churn > 0)
+        ltv_num = s['ticket'] * mc_pct
+        ltv = ltv_num / s['churn'] if s['churn'] > 0 else 0
+        
+        # Proteção Payback: CAC / (Ticket x Margem) (Se margem > 0)
+        payback = cac / ltv_num if ltv_num > 0 else 0
         
         dados.append({
             'Mês': m,
@@ -211,7 +170,7 @@ with tab_dash:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1: card("Faturamento Mensal", f['2.1 Receita Bruta Total'], "Projeção Mês 12", "neutral")
-    with c2: card("Lucro Líquido", f['6. Lucro Líquido'], f"Margem: {(f['6. Lucro Líquido']/f['2.1 Receita Bruta Total'])*100:.1f}%", "good" if f['6. Lucro Líquido']>0 else "bad")
+    with c2: card("Lucro Líquido", f['6. Lucro Líquido'], f"Margem: {(f['6. Lucro Líquido']/f['2.1 Receita Bruta Total'])*100:.1f}%" if f['2.1 Receita Bruta Total'] > 0 else "0%", "good" if f['6. Lucro Líquido']>0 else "bad")
     with c3: card("Caixa Mínimo (Break-Even)", f['7. Ponto Equilíbrio (R$)'], "Necessário para 0x0", "neutral")
     with c4: card("Base de Clientes", int(f['1. Clientes Ativos']), f"Novos: +{int(f['1.1 Novos'])}", "neutral", False)
 
@@ -255,6 +214,7 @@ with tab_dre:
         "7. Ponto Equilíbrio (R$)", "Fator R (%)",
         "CAC (R$)", "LTV (R$)", "Payback (Meses)", "NRR (Estimado)"
     ]
+    
     df_dre = df_dre.reindex(ordem_logica)
     
     def formatar_valores(val, idx_name):
@@ -272,7 +232,7 @@ with tab_dre:
     csv = df_display.to_csv().encode('utf-8')
     st.download_button("📥 Baixar DRE Formatado (.csv)", data=csv, file_name="DRE_Vaiontec.csv", mime="text/csv")
 
-# --- ABA 3: INPUTS (CORRIGIDA) ---
+# --- ABA 3: INPUTS (CORRIGIDA E SEGURA) ---
 with tab_input:
     modo = st.radio("Modo:", ["📝 Edição Manual", "📂 Upload Padrão"], horizontal=True)
     st.markdown("---")
@@ -286,7 +246,7 @@ with tab_input:
             up = st.file_uploader("Upload .csv", type=['csv'])
             if up: processar_upload(pd.read_csv(up))
     else:
-        # HELPERS DE INPUT (CORRIGIDOS PARA ACEITAR ZERO E EDICAO LIVRE)
+        # HELPER DE INPUT SEGURO
         def input_box(key, label, desc, fmt="%.2f", step=0.01, min_val=0.0):
             st.markdown(f"""
             <div class='input-card'>
@@ -294,7 +254,7 @@ with tab_input:
                 <div class='input-desc'>{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-            # Use o argumento KEY para binding direto. Min Value 0.0 permite zero.
+            # min_val=0.0 permite zero. step define precisão.
             st.number_input(label, key=key, format=fmt, step=step, min_value=min_val, label_visibility="collapsed")
 
         c1, c2, c3 = st.columns(3)
@@ -335,8 +295,8 @@ with tab_input:
             input_box('encargos', "Encargos Folha (%)", "FGTS, Férias, 13º (Simples ~35%).")
             input_box('deprec', "Depreciação (R$)", "Perda valor equip. (Notebooks).")
             input_box('amort', "Amortização (R$)", "Perda valor intangível (Software).")
-            # Fin pode ser negativo, entao min_val=None
-            input_box('fin', "Res. Financeiro (R$)", "Rendimentos (+) ou Juros Pagos (-).", min_val=None)
+            # Res Financeiro pode ser negativo (min_val=None)
+            input_box('fin', "Res. Financeiro (R$)", "Rendimentos (+) ou Juros Pagos (-).", "%.2f", 0.01, None)
 
 # --- ABA 4: GLOSSÁRIO ---
 with tab_gloss:
