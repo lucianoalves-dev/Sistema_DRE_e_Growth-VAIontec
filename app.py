@@ -4,308 +4,336 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Sistema Financeiro Vaiontec", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Vaiontec Financial Suite", layout="wide", page_icon="💎")
 
-# --- CSS PARA ESTILIZAÇÃO ---
+# --- ESTILIZAÇÃO CSS (DESIGN SYSTEM BLUE) ---
 st.markdown("""
     <style>
-    .metric-card { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #1f497d; }
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
-    .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: #f0f2f6; border-radius: 4px 4px 0px 0px; gap: 1px; padding-top: 10px; padding-bottom: 10px; }
-    .stTabs [aria-selected="true"] { background-color: #e6f3ff; border-bottom: 2px solid #1f497d; }
+    /* Fundo e Fontes */
+    .main { background-color: #f8f9fa; }
+    h1, h2, h3 { color: #1f497d; font-family: 'Helvetica Neue', sans-serif; }
+    
+    /* Cartões de Métricas (KPI Cards) */
+    div.css-1r6slb0 { background-color: #ffffff; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    
+    /* Estilo Personalizado para Métricas */
+    .kpi-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border-left: 6px solid #1f497d; /* Azul Vaiontec */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 10px;
+    }
+    .kpi-title { font-size: 14px; color: #666; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; }
+    .kpi-value { font-size: 28px; color: #1f497d; font-weight: 700; margin: 5px 0; }
+    .kpi-delta { font-size: 12px; color: #28a745; font-weight: 600; }
+    .kpi-delta.neg { color: #dc3545; }
+    
+    /* Abas */
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background-color: #ffffff; border-radius: 4px; color: #1f497d; border: 1px solid #e1e4e8; }
+    .stTabs [aria-selected="true"] { background-color: #1f497d; color: white; }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] { background-color: #f0f4f8; border-right: 1px solid #d1d9e6; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- MOTOR DE CÁLCULO ---
-def calcular_dre(premissas, staff):
+def calcular_dre_completo(p, staff):
     meses = list(range(1, 13))
     dados = []
     
-    clientes_atual = premissas['clientes_iniciais']
-    
-    # Custo Base da Folha (Salário x Quantidade)
+    clientes_atual = p['clientes_iniciais']
     custo_folha_base = sum([c['salario'] * c['qtd'] for c in staff])
+    
+    # NRR Estimado (Projeção): 1 + Upsell - Churn
+    # Em dados reais, compararia safras (Cohorts).
+    nrr_projetado = (1 + p['upsell'] - p['churn_rate'])
 
     for m in meses:
-        # 1. Growth
-        novos = int(clientes_atual * premissas['crescimento'])
-        churn = int(clientes_atual * premissas['churn_rate'])
-        clientes_fim = clientes_atual + novos - churn
+        # 1. Base de Clientes
+        novos = int(clientes_atual * p['crescimento'])
+        perda = int(clientes_atual * p['churn_rate'])
+        clientes_fim = clientes_atual + novos - perda
         
-        # 2. Receita
-        rec_base = clientes_fim * premissas['ticket']
-        upsell = rec_base * premissas['upsell']
-        rec_bruta = rec_base + upsell
+        # 2. Receita (Top Line)
+        mrr_base = clientes_fim * p['ticket'] # Receita Recorrente Mensal
+        expansao = mrr_base * p['upsell']
+        receita_bruta = mrr_base + expansao
+        arr = receita_bruta * 12 # Annual Recurring Revenue (Run Rate)
         
         # 3. Deduções
-        impostos = rec_bruta * premissas['imposto_simples']
-        rec_liq = rec_bruta - impostos
+        impostos = receita_bruta * p['imposto_simples']
+        receita_liq = receita_bruta - impostos
         
-        # 4. COGS (Custo de Entrega)
-        # Antiga "Infraestrutura". Agora reflete custo direto por cliente.
-        cogs_total = clientes_fim * premissas['cogs_unitario'] 
+        # 4. Custos Variáveis (COGS + Vendas)
+        cogs = clientes_fim * p['cogs_unitario'] # Custo do Serviço (Infra/Licenças)
+        comissoes = receita_bruta * p['comissao']
+        taxas_pg = receita_bruta * p['taxa_pgto']
+        custos_var_total = cogs + comissoes + taxas_pg
         
-        # 5. Custos Variáveis de Venda
-        comissoes = rec_bruta * premissas['comissao']
-        taxas_pagto = rec_bruta * premissas['taxa_pgto']
+        # 5. Margem de Contribuição
+        margem_cont = receita_liq - custos_var_total
+        margem_cont_pct = (margem_cont / receita_liq) if receita_liq > 0 else 0
         
-        # 6. Margem de Contribuição
-        custos_var_total = cogs_total + comissoes + taxas_pagto
-        margem_cont = rec_liq - custos_var_total
+        # 6. Despesas Fixas (OpEx)
+        encargos = custo_folha_base * p['encargos_pct']
+        folha_total = custo_folha_base + encargos
+        despesas_operacionais = folha_total + p['mkt'] + p['outras_fixas']
         
-        # 7. Despesas Fixas (OpEx)
-        encargos = custo_folha_base * premissas['encargos_pct']
-        total_folha_encargos = custo_folha_base + encargos
-        despesas_fixas = total_folha_encargos + premissas['mkt'] + premissas['outras_fixas']
+        # 7. EBITDA (Lucro Operacional de Caixa)
+        ebitda = margem_cont - despesas_operacionais
+        ebitda_margem = (ebitda / receita_liq) if receita_liq > 0 else 0
         
-        # 8. Resultados Operacionais
-        ebitda = margem_cont - despesas_fixas
-        deprec_amort = premissas['depreciacao'] + premissas['amortizacao']
-        res_fin = premissas['res_financeiro']
+        # 8. Abaixo do EBITDA
+        deprec_amort = p['depreciacao'] + p['amortizacao']
+        ebit = ebitda - deprec_amort
         
-        # 9. Resultado Final
-        lair = ebitda - deprec_amort + res_fin
-        irpj_extra = lair * premissas['irpj_extra'] if lair > 0 else 0
-        lucro_liq = lair - irpj_extra
+        # Financeiro e Imposto s/ Lucro
+        res_fin = p['res_financeiro']
+        lair = ebit + res_fin
+        irpj_csll = lair * p['irpj_extra'] if lair > 0 else 0 # 0 no Simples
         
-        # 10. KPIs Avançados
+        lucro_liq = lair - irpj_csll
+        margem_liq = (lucro_liq / receita_liq) if receita_liq > 0 else 0
         
-        # Ponto de Equilíbrio (R$)
-        # Soma de todos os custos que não variam diretamente com a venda unitária imediata
-        custos_estrutura_total = despesas_fixas + deprec_amort - res_fin
-        margem_pct = (margem_cont / rec_bruta) if rec_bruta > 0 else 0
-        pe_receita = custos_estrutura_total / margem_pct if margem_pct > 0 else 0
+        # 9. KPIs Específicos
         
         # Fator R
-        fator_r = (custo_folha_base + encargos) / rec_bruta if rec_bruta > 0 else 0
+        fator_r = folha_total / receita_bruta if receita_bruta > 0 else 0
+        
+        # Ponto de Equilíbrio (Break-Even)
+        custos_fixos_totais = despesas_operacionais + deprec_amort - res_fin
+        # Margem bruta sobre Receita Bruta (para cálculo de PE sobre faturamento bruto)
+        margem_bruta_pct = (margem_cont / receita_bruta) if receita_bruta > 0 else 0
+        pe_receita = custos_fixos_totais / margem_bruta_pct if margem_bruta_pct > 0 else 0
+        
+        # Unit Economics
+        cac = (p['mkt'] + comissoes) / novos if novos > 0 else 0
+        # LTV = (Ticket * Margem Contribuição %) / Churn
+        # Margem Contribuição % aqui é sobre a receita líquida ou bruta? 
+        # Tradicionalmente usa-se Gross Margin. Usaremos Margem de Contribuição / Rec Liq
+        ltv = (p['ticket'] * margem_cont_pct) / p['churn_rate'] if p['churn_rate'] > 0 else 0
+        payback = cac / (p['ticket'] * margem_cont_pct) if (p['ticket'] * margem_cont_pct) > 0 else 0
 
-        # CAC e LTV
-        cac = (premissas['mkt'] + comissoes) / novos if novos > 0 else 0
-        ltv = (premissas['ticket'] * (margem_cont/rec_liq)) / premissas['churn_rate'] if premissas['churn_rate'] > 0 else 0
-        payback = cac / (premissas['ticket'] * (margem_cont/rec_liq)) if (premissas['ticket'] * (margem_cont/rec_liq)) > 0 else 0
-
-        registro = {
+        dados.append({
             'Mês': f'Mês {m}',
-            'Clientes Ativos': clientes_fim,
+            'Clientes': clientes_fim,
             'Novos': novos,
-            'Receita Bruta': rec_bruta,
-            'Receita Líquida': rec_liq,
-            'COGS (Entrega)': cogs_total,
-            'Margem Contrib.': margem_cont,
+            'Churn': perda,
+            'MRR (Recorrente)': mrr_base,
+            'Receita Bruta': receita_bruta,
+            'Receita Líquida': receita_liq,
+            'COGS': cogs,
+            'Margem Contribuição ($)': margem_cont,
+            'Margem Contribuição (%)': margem_cont_pct,
             'EBITDA': ebitda,
+            'EBITDA (%)': ebitda_margem,
             'Lucro Líquido': lucro_liq,
-            'Ponto Equilíbrio (R$)': pe_receita,
+            'Margem Líquida (%)': margem_liq,
             'Fator R': fator_r,
+            'Ponto Equilíbrio (R$)': pe_receita,
             'CAC': cac,
             'LTV': ltv,
-            'Payback (Meses)': payback
-        }
-        dados.append(registro)
-        clientes_atual = clientes_fim # Atualiza loop
+            'NRR Estimado': nrr_projetado,
+            'Folha Total': folha_total
+        })
+        
+        clientes_atual = clientes_fim
         
     return pd.DataFrame(dados)
 
-# --- BARRA LATERAL (INPUTS) ---
+# --- COMPONENTE DE CARTÃO KPI (HTML PURO) ---
+def kpi_card(title, value, subtitle="", is_money=True, color="blue"):
+    val_str = f"R$ {value:,.2f}" if is_money else f"{value}"
+    
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">{title}</div>
+        <div class="kpi-value">{val_str}</div>
+        <div class="kpi-delta">{subtitle}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- SIDEBAR (CONFIGURAÇÕES) ---
 with st.sidebar:
-    st.title("⚙️ Configurações")
-    modo_input = st.radio("Fonte de Dados:", ["Simulação Manual", "Upload CSV"], horizontal=True)
-    
-    premissas = {}
-    staff = []
-    
-    if modo_input == "Simulação Manual":
-        with st.expander("1. Vendas & Growth", expanded=True):
-            premissas['clientes_iniciais'] = st.number_input("Clientes Iniciais", value=50)
-            premissas['crescimento'] = st.number_input("Cresc. Mensal (%)", 0.0, 1.0, 0.10, format="%.2f")
-            premissas['churn_rate'] = st.number_input("Churn Rate (%)", 0.0, 1.0, 0.03, format="%.2f")
-            premissas['ticket'] = st.number_input("Ticket Médio (R$)", value=500.0)
-            premissas['upsell'] = st.number_input("Upsell (% da Rec.)", 0.0, 1.0, 0.05)
-        
-        with st.expander("2. Custos Variáveis (COGS/Impostos)", expanded=False):
-            st.info("💡 **COGS:** Custo direto para entregar o serviço (Cloud, API, Licenças).")
-            premissas['cogs_unitario'] = st.number_input("COGS Unitário (por Cliente)", value=30.0)
-            premissas['comissao'] = st.number_input("Comissão Vendas (%)", 0.0, 1.0, 0.05)
-            premissas['taxa_pgto'] = st.number_input("Taxa Meios Pagto (%)", 0.0, 1.0, 0.02)
-            premissas['imposto_simples'] = st.number_input("Simples Nacional (%)", 0.0, 1.0, 0.06)
-        
-        with st.expander("3. Despesas Fixas & Mkt", expanded=False):
-            premissas['mkt'] = st.number_input("Marketing/Ads (R$)", value=5000.0)
-            premissas['outras_fixas'] = st.number_input("Outros Fixos (Aluguel, etc)", value=3000.0)
-            premissas['encargos_pct'] = st.number_input("Encargos Folha (%)", 0.0, 1.0, 0.35)
-            
-        with st.expander("4. Contábil & Financeiro", expanded=False):
-            premissas['depreciacao'] = st.number_input("Depreciação Mensal", value=400.0)
-            premissas['amortizacao'] = st.number_input("Amortização Mensal", value=600.0)
-            premissas['res_financeiro'] = st.number_input("Resultado Financeiro (+/-)", value=0.0)
-            premissas['irpj_extra'] = st.number_input("IRPJ Extra (Se não for Simples)", 0.0, 1.0, 0.0)
-            
-        with st.expander("5. Quadro de Funcionários (Folha)", expanded=False):
-            st.caption("Insira salários unitários e quantidade")
-            c1, c2 = st.columns(2)
-            with c1:
-                sal_socio = st.number_input("Pró-Labore Sócio", value=8000.0)
-                sal_dev = st.number_input("Salário Dev", value=5000.0)
-                sal_cs = st.number_input("Salário Suporte", value=2500.0)
-                sal_vendas = st.number_input("Salário Vendas", value=3000.0)
-            with c2:
-                qtd_socio = st.number_input("Qtd Sócios", value=2, step=1)
-                qtd_dev = st.number_input("Qtd Devs", value=2, step=1)
-                qtd_cs = st.number_input("Qtd Suporte", value=1, step=1)
-                qtd_vendas = st.number_input("Qtd Vendas", value=1, step=1)
-            
-            staff = [
-                {'salario': sal_socio, 'qtd': qtd_socio},
-                {'salario': sal_dev, 'qtd': qtd_dev},
-                {'salario': sal_cs, 'qtd': qtd_cs},
-                {'salario': sal_vendas, 'qtd': qtd_vendas},
-            ]
-    else:
-        st.info("Para usar upload, envie um arquivo CSV com as colunas: 'parametro' e 'valor'.")
-        uploaded_file = st.file_uploader("Arquivo de Premissas", type="csv")
-        if uploaded_file is None:
-            st.warning("Aguardando arquivo. Usando dados padrão para visualização.")
-            # Mock de dados para não quebrar a tela sem arquivo
-            # (Em um app real, aqui entraria o parser do CSV)
-            # Replicando defaults apenas para rodar
-            premissas = {'clientes_iniciais':50, 'crescimento':0.1, 'churn_rate':0.03, 'ticket':500, 'upsell':0.05,
-                         'cogs_unitario':30, 'comissao':0.05, 'taxa_pgto':0.02, 'imposto_simples':0.06,
-                         'mkt':5000, 'outras_fixas':3000, 'encargos_pct':0.35, 'depreciacao':400,
-                         'amortizacao':600, 'res_financeiro':0, 'irpj_extra':0}
-            staff = [{'salario':26500, 'qtd':1}] # Soma simplificada
-
-# --- PROCESSAMENTO ---
-df = calcular_dre(premissas, staff)
-mes_final = df.iloc[-1]
-
-# --- DASHBOARD PRINCIPAL ---
-st.title("🚀 Sistema de Gestão Financeira - VAIONTEC")
-
-# TAB SYSTEM
-tab1, tab2, tab3 = st.tabs(["📊 Dashboard & KPIs", "📋 DRE Detalhado", "🎓 Glossário & Fórmulas"])
-
-with tab1:
-    # CARTÕES DE TOPO
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Receita Mensal (Mês 12)", f"R$ {mes_final['Receita Bruta']:,.2f}", f"{premissas['crescimento']*100:.0f}% Growth")
-    
-    cor_lucro = "normal" if mes_final['Lucro Líquido'] > 0 else "inverse"
-    col2.metric("Lucro Líquido (Mês 12)", f"R$ {mes_final['Lucro Líquido']:,.2f}", delta_color=cor_lucro)
-    
-    col3.metric("Clientes Ativos", int(mes_final['Clientes Ativos']), f"-{premissas['churn_rate']*100:.1f}% Churn")
-    
-    status_fator_r = "✅ Anexo III" if mes_final['Fator R'] >= 0.28 else "⚠️ Anexo V (Caro)"
-    col4.metric("Fator R (Imposto)", f"{mes_final['Fator R']*100:.1f}%", status_fator_r)
-
+    st.title("🔧 Configurações")
     st.markdown("---")
     
-    # GRÁFICO 1: PONTO DE EQUILÍBRIO
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        st.subheader("🏁 Corrida para o Ponto de Equilíbrio")
-        fig_be = go.Figure()
-        fig_be.add_trace(go.Scatter(x=df['Mês'], y=df['Receita Bruta'], name='Receita Bruta', 
-                                    line=dict(color='#00CC96', width=4)))
-        fig_be.add_trace(go.Scatter(x=df['Mês'], y=df['Ponto Equilíbrio (R$)'], name='Ponto de Equilíbrio', 
-                                    line=dict(color='#EF553B', dash='dot', width=2)))
-        fig_be.update_layout(height=400, template="plotly_white", legend=dict(orientation="h", y=1.1))
-        st.plotly_chart(fig_be, use_container_width=True)
-    
-    with c2:
-        st.subheader("💰 Distribuição (Mês 12)")
-        labels = ['COGS (Entrega)', 'Impostos', 'Despesas Op.', 'Lucro Líquido']
-        values = [mes_final['COGS (Entrega)'], 
-                  mes_final['Receita Bruta']*premissas['imposto_simples'],
-                  (mes_final['Receita Líquida'] - mes_final['Lucro Líquido'] - mes_final['COGS (Entrega)']),
-                  max(0, mes_final['Lucro Líquido'])]
-        fig_pie = px.pie(values=values, names=labels, hole=0.4)
-        fig_pie.update_layout(height=400, showlegend=False)
-        st.plotly_chart(fig_pie, use_container_width=True)
+    with st.expander("1. Growth & Receita (CRO)", expanded=True):
+        p_clientes = st.number_input("Clientes Iniciais", value=50)
+        p_crescimento = st.number_input("Cresc. Mensal (%)", value=0.10, step=0.01)
+        p_churn = st.number_input("Churn Rate (%)", value=0.03, step=0.01)
+        p_ticket = st.number_input("Ticket Médio (R$)", value=500.0)
+        p_upsell = st.number_input("Upsell (% MRR)", value=0.05, step=0.01)
 
-    # GRÁFICO 2: GROWTH
-    st.subheader("📈 Eficiência de Growth (CAC vs LTV)")
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        fig_growth = go.Figure()
-        fig_growth.add_trace(go.Bar(x=df['Mês'], y=df['LTV'], name='LTV (Valor Vitalício)', marker_color='#636EFA'))
-        fig_growth.add_trace(go.Bar(x=df['Mês'], y=df['CAC'], name='CAC (Custo Aquisição)', marker_color='#FFA15A'))
-        fig_growth.update_layout(barmode='group', height=350, template="plotly_white")
-        st.plotly_chart(fig_growth, use_container_width=True)
+    with st.expander("2. Custos & Tributos (CFO)", expanded=False):
+        p_cogs = st.number_input("COGS Unitário (Infra/Lic)", value=30.0, help="Custo direto de entrega por cliente")
+        p_comissao = st.number_input("Comissão Vendas (%)", value=0.05, step=0.01)
+        p_imposto = st.number_input("Simples Nacional (%)", value=0.06, step=0.01)
+        p_taxa = st.number_input("Taxa Meios Pagto (%)", value=0.02, step=0.01)
+        p_mkt = st.number_input("Verba Marketing (CAC)", value=5000.0)
+        p_outros = st.number_input("Outros Fixos (Aluguel)", value=3000.0)
+        
+    with st.expander("3. Pessoal (Folha)", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            s_socio = st.number_input("Pró-Labore Sócio", 8000.0)
+            s_dev = st.number_input("Sal. Dev", 5000.0)
+            s_cs = st.number_input("Sal. Suporte", 2500.0)
+            s_venda = st.number_input("Sal. Vendas", 3000.0)
+        with col2:
+            q_socio = st.number_input("Qtd", 2)
+            q_dev = st.number_input("Qtd", 2)
+            q_cs = st.number_input("Qtd", 1)
+            q_venda = st.number_input("Qtd", 1)
+            
+        p_encargos = st.number_input("Encargos (%)", value=0.35, step=0.01)
+        
+    with st.expander("4. Contábil", expanded=False):
+        p_deprec = st.number_input("Depreciação", 400.0)
+        p_amort = st.number_input("Amortização", 600.0)
+        p_fin = st.number_input("Res. Financeiro", 0.0)
+        p_irpj = st.number_input("IRPJ Extra", 0.0)
+
+    # Monta Dicionário e Staff
+    premissas = {
+        'clientes_iniciais': p_clientes, 'crescimento': p_crescimento, 'churn_rate': p_churn,
+        'ticket': p_ticket, 'upsell': p_upsell, 'cogs_unitario': p_cogs, 'comissao': p_comissao,
+        'imposto_simples': p_imposto, 'taxa_pgto': p_taxa, 'mkt': p_mkt, 'outras_fixas': p_outros,
+        'encargos_pct': p_encargos, 'depreciacao': p_deprec, 'amortizacao': p_amort,
+        'res_financeiro': p_fin, 'irpj_extra': p_irpj
+    }
+    staff_list = [
+        {'salario': s_socio, 'qtd': q_socio}, {'salario': s_dev, 'qtd': q_dev},
+        {'salario': s_cs, 'qtd': q_cs}, {'salario': s_venda, 'qtd': q_venda}
+    ]
+
+# --- CÁLCULO ---
+df = calcular_dre_completo(premissas, staff_list)
+final = df.iloc[-1] # Mês 12
+
+# --- DASHBOARD (MAIN) ---
+st.title("Vaiontec | Executive Dashboard")
+st.markdown(f"**Visão Projetada (Mês 12)** • Clientes Ativos: **{int(final['Clientes'])}**")
+
+tab1, tab2, tab3 = st.tabs(["📊 Visão Estratégica (CRO/CFO)", "📑 DRE Detalhado", "📚 Glossário Financeiro"])
+
+with tab1:
+    # LINHA 1: TOP LINE & BOTTOM LINE
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        kpi_card("MRR (Receita Mensal)", final['Receita Bruta'], f"ARR: R$ {final['Receita Bruta']*12:,.0f}")
+    with col2:
+        kpi_card("EBITDA", final['EBITDA'], f"Margem: {final['EBITDA (%)']*100:.1f}%")
+    with col3:
+        cor_status = "✅ Lucro" if final['Lucro Líquido'] > 0 else "🔻 Prejuízo"
+        kpi_card("Lucro Líquido", final['Lucro Líquido'], cor_status)
+    with col4:
+        # Cash Runway ou Ponto de Equilibrio
+        kpi_card("Ponto de Equilíbrio", final['Ponto Equilíbrio (R$)'], "Necessário para 0x0")
+
+    st.markdown("---")
+
+    # LINHA 2: UNIT ECONOMICS & GROWTH
+    col_a, col_b, col_c, col_d = st.columns(4)
+    with col_a:
+        kpi_card("LTV (Valor Cliente)", final['LTV'])
+    with col_b:
+        kpi_card("CAC (Custo Aquisição)", final['CAC'])
+    with col_c:
+        razao = final['LTV']/final['CAC'] if final['CAC'] > 0 else 0
+        kpi_card("LTV / CAC", razao, "Meta > 3.0x", is_money=False)
+    with col_d:
+        kpi_card("NRR (Retenção)", f"{final['NRR Estimado']*100:.1f}%", "Meta > 100%", is_money=False)
+
+    st.markdown("---")
+
+    # LINHA 3: GRÁFICOS
+    c1, c2 = st.columns([2, 1])
     
-    with col_g2:
-        st.info(f"**Análise Mês 12:**\n\nPara cada R$ 1,00 investido em adquirir um cliente (CAC), ele retorna **R$ {mes_final['LTV']/mes_final['CAC']:.2f}** ao longo da vida (LTV).\n\nO cliente demora **{mes_final['Payback (Meses)']:.1f} meses** para 'se pagar' (Payback).")
+    with c1:
+        st.subheader("Análise de Resultado (Waterfall)")
+        # Gráfico de Barras Empilhadas ou Linhas
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df['Mês'], y=df['Receita Bruta'], name='Receita Bruta', line=dict(color='#1f497d', width=3)))
+        fig.add_trace(go.Scatter(x=df['Mês'], y=df['EBITDA'], name='EBITDA', line=dict(color='#28a745', width=3)))
+        fig.add_trace(go.Scatter(x=df['Mês'], y=df['Ponto Equilíbrio (R$)'], name='Ponto de Equilíbrio', line=dict(color='#dc3545', dash='dot')))
+        fig.update_layout(template="plotly_white", height=400, margin=dict(l=20, r=20, t=30, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+        
+    with c2:
+        st.subheader("Folha vs Receita")
+        # Indicador de Fator R
+        fator_r_pct = final['Fator R']*100
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = fator_r_pct,
+            title = {'text': "Fator R (Meta > 28%)"},
+            gauge = {
+                'axis': {'range': [0, 50]},
+                'bar': {'color': "#1f497d"},
+                'steps': [
+                    {'range': [0, 28], 'color': "#ffc7ce"},
+                    {'range': [28, 50], 'color': "#c6efce"}],
+                'threshold': {
+                    'line': {'color': "red", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 28}}))
+        fig_gauge.update_layout(height=350, margin=dict(l=20, r=20, t=30, b=20))
+        st.plotly_chart(fig_gauge, use_container_width=True)
 
 with tab2:
-    st.subheader("Demonstrativo de Resultados do Exercício (DRE)")
+    st.markdown("### 📑 Demonstrativo de Resultados do Exercício (DRE)")
     
-    # Formatando para exibição em Tabela
-    df_display = df.copy()
-    format_money = lambda x: f"R$ {x:,.2f}"
-    format_pct = lambda x: f"{x*100:.1f}%"
+    # Preparar DataFrame para visualização bonita
+    df_vis = df.copy()
     
-    cols_money = ['Receita Bruta', 'Receita Líquida', 'COGS (Entrega)', 'Margem Contrib.', 'EBITDA', 'Lucro Líquido', 'Ponto Equilíbrio (R$)', 'CAC', 'LTV']
-    for col in cols_money:
-        df_display[col] = df_display[col].apply(format_money)
+    # Formatar colunas monetárias
+    cols_money = ['MRR (Recorrente)', 'Receita Bruta', 'Receita Líquida', 'COGS', 'Margem Contribuição ($)', 'EBITDA', 'Lucro Líquido', 'Ponto Equilíbrio (R$)', 'Folha Total']
+    for c in cols_money:
+        df_vis[c] = df_vis[c].apply(lambda x: f"R$ {x:,.2f}")
+        
+    # Formatar percentuais
+    cols_pct = ['Margem Contribuição (%)', 'EBITDA (%)', 'Margem Líquida (%)', 'NRR Estimado', 'Fator R']
+    for c in cols_pct:
+        df_vis[c] = df_vis[c].apply(lambda x: f"{x*100:.1f}%")
+        
+    # Exibir tabela interativa
+    st.dataframe(df_vis, use_container_width=True, height=600)
     
-    df_display['Fator R'] = df_display['Fator R'].apply(format_pct)
-    
-    st.dataframe(df_display, use_container_width=True, height=600)
-    
-    # Botão de Download
+    # Download
     csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Baixar DRE em Excel/CSV", data=csv, file_name="DRE_Vaiontec_Sistema.csv", mime="text/csv")
+    st.download_button("📥 Baixar Planilha Completa (Excel/CSV)", data=csv, file_name="DRE_Vaiontec_Executive.csv", mime="text/csv")
 
 with tab3:
-    st.header("🎓 Glossário e Metodologia de Cálculo")
-    
     st.markdown("""
-    ### 1. COGS (Cost of Goods Sold / Custo dos Serviços Prestados)
-    **Antiga nomenclatura:** *Infraestrutura / Custos Variáveis*
+    ### 📘 Glossário Avançado (SaaS & Finanças)
     
-    **O que é:** Representa o custo direto para "entregar" o software ao cliente. Se você não vendesse nada, esse custo seria zero.
+    #### 1. Métricas de Receita (Top Line)
+    * **MRR (Monthly Recurring Revenue):** Receita recorrente mensal. É o "coração" do SaaS. 
+    * **ARR (Annual Recurring Revenue):** MRR x 12. Mostra o tamanho anualizado da empresa.
+    * **NRR (Net Revenue Retention):** A métrica mais importante para Valuation. 
+        * *Fórmula:* `(Receita Base + Expansão - Churn) / Receita Base`. 
+        * *Meta:* > 100% (significa que a empresa cresce mesmo sem vender para novos clientes).
     
-    **Composição na Vaiontec:**
-    * 📡 **Infraestrutura Cloud:** AWS/Azure/Google Cloud (Servidores que escalam com uso).
-    * 🔑 **Licenças Embarcadas:** APIs pagas por chamada, Banco de Dados, Ferramentas de terceiro por usuário.
-    * 👷 **Hora Técnica Variável:** Se houvesse setup manual por cliente.
+    #### 2. Margens e Lucratividade
+    * **COGS (Cost of Goods Sold):** Custos diretos de entrega (Servidor, Licença, Suporte N1).
+    * **Margem de Contribuição:** `Receita Líquida - (COGS + Impostos Variáveis + Comissões)`. É quanto sobra para pagar a estrutura fixa.
+    * **EBITDA (LAJIDA):** Lucro Operacional antes de Juros, Impostos, Depreciação e Amortização. É o melhor indicador de geração de caixa operacional.
+    * **EBIT (LAJIR):** EBITDA descontando a Depreciação (computadores) e Amortização (software desenvolvido).
     
-    **Fórmula no Sistema:**
-    $$
-    \\text{COGS Total} = \\text{Clientes Ativos} \\times \\text{Custo Unitário (Input)}
-    $$
+    #### 3. Eficiência (Unit Economics)
+    * **CAC:** Custo para adquirir 1 cliente (Marketing + Vendas).
+    * **LTV:** Lucro bruto que 1 cliente deixa na vida toda.
+    * **LTV/CAC:** O "Santo Graal". Se for < 1, você perde dinheiro vendendo. O ideal é > 3.
+    * **Ponto de Equilíbrio (Break-Even):** Faturamento necessário para Lucro Líquido = 0.
     
-    ---
-    
-    ### 2. Ponto de Equilíbrio (Break-Even Point)
-    **O que é:** O valor exato de faturamento necessário para cobrir todos os custos e despesas. É o momento onde o Lucro = 0.
-    
-    **Por que é vital?** Abaixo deste valor, a Vaiontec "queima caixa". Acima dele, gera riqueza.
-    
-    **Fórmula:**
-    $$
-    PE (R\$) = \\frac{\\text{Despesas Fixas} + \\text{Folha} + \\text{Depreciação} - \\text{Res. Financeiro}}{\\text{Margem de Contribuição (\%)}}
-    $$
-    
-    ---
-    
-    ### 3. Fator R (Simples Nacional)
-    **O que é:** Uma regra da Receita Federal para empresas de tecnologia no Simples.
-    
-    **A Regra de Ouro:**
-    * Se a Folha de Pagamento for **menor que 28%** do Faturamento -> Você paga **Anexo V (começa em ~15.5%)**. 💸
-    * Se a Folha for **maior que 28%** do Faturamento -> Você paga **Anexo III (começa em ~6%)**. 💰
-    
-    **Estratégia:** Aumentamos o Pró-labore dos sócios na simulação para garantir que você fique no Anexo III.
-    
-    ---
-    
-    ### 4. LTV vs CAC (A "Máquina de Vendas")
-    **CAC (Custo de Aquisição):** Quanto gasto de Marketing + Comissão para trazer 1 cliente.
-    **LTV (Valor Vitalício):** Quanto lucro esse cliente deixa antes de cancelar (Churn).
-    
-    **Fórmula LTV:**
-    $$
-    LTV = \\frac{\\text{Ticket Médio} \\times \\text{Margem Contribuição \%}}{\\text{Churn Rate \%}}
-    $$
-    
-    **Meta de Mercado:** O LTV deve ser pelo menos **3x maior** que o CAC.
+    #### 4. Tributário
+    * **Fator R:** Razão entre Folha de Pagamento e Faturamento Bruto.
+        * Se Folha > 28% da Receita -> Anexo III (Imposto Reduzido).
+        * Se Folha < 28% da Receita -> Anexo V (Imposto Alto).
+        * *O sistema monitora isso automaticamente no gráfico de "velocímetro".*
     """)
